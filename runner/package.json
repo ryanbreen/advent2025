@@ -1,0 +1,13 @@
+{
+  "name": "aoc-runner",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Advent of Code 2025 runner with Playwright session management",
+  "scripts": {
+    "login": "node session.js login",
+    "extract": "node extract.js"
+  },
+  "dependencies": {
+    "playwright": "^1.40.0"
+  }
+}
