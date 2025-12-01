@@ -15,5 +15,10 @@ venv/
 .vscode/
 .idea/
 
+# C compiled binaries
+*.out
+day01/c/solution
+day01/c/test
+
 # OS
 .DS_Store
