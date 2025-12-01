@@ -6,7 +6,7 @@ Solutions to [Advent of Code 2025](https://adventofcode.com/2025) implemented in
 
 This project takes a unique approach to Advent of Code:
 
-1. **Multi-language solutions**: Each day's puzzle is solved in multiple languages (Node.js, Python, Clojure, C, Bash, and sometimes esoteric languages like Brainfuck) to validate correctness through independent implementations.
+1. **Multi-language solutions**: Each day's puzzle is solved in multiple languages (Node.js, Python, Clojure, C, Rust, Bash, and sometimes esoteric languages like Brainfuck) to validate correctness through independent implementations.
 
 2. **Parallel agent solving**: Solutions are developed by independent AI agents working in parallel, each implementing the solution in their assigned language without seeing other implementations. When all agents converge on the same answer, we have high confidence in correctness.
 
@@ -32,6 +32,7 @@ advent2025/
     ├── python/solution.py # Python solution
     ├── clojure/solution.clj
     ├── c/solution.c
+    ├── rust/src/main.rs
     ├── bash/solution.sh
     └── ...
 ```
@@ -70,6 +71,9 @@ clj day01/clojure/solution.clj
 # C
 gcc -o day01/c/solution day01/c/solution.c && ./day01/c/solution
 
+# Rust
+cd day01/rust && cargo run --release
+
 # Bash
 bash day01/bash/solution.sh
 ```
@@ -85,7 +89,7 @@ node runner/submit.js <day> <part> <answer>
 
 | Day | Stars | Languages |
 |-----|-------|-----------|
-| 1   | ⭐⭐   | Node.js, Python, Clojure, C, Bash, Brainfuck |
+| 1   | ⭐⭐   | Node.js, Python, Clojure, C, Rust, Bash, Brainfuck |
 
 ## Philosophy
 
