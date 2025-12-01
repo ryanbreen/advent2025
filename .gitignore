@@ -20,5 +20,8 @@ venv/
 day01/c/solution
 day01/c/test
 
+# Rust
+target/
+
 # OS
 .DS_Store
