@@ -6,7 +6,7 @@ Solutions to [Advent of Code 2025](https://adventofcode.com/2025) implemented in
 
 This project takes a unique approach to Advent of Code:
 
-1. **Multi-language solutions**: Each day's puzzle is solved in 12 languages (C, C++, Rust, Go, Node.js, Python, PHP, Perl, Bash, Clojure, Common Lisp, and Brainfuck) to validate correctness through independent implementations.
+1. **Multi-language solutions**: Each day's puzzle is solved in 13 languages (ARM64 Assembly, C, C++, Rust, Go, Node.js, Python, PHP, Perl, Bash, Clojure, Common Lisp, and Brainfuck) to validate correctness through independent implementations.
 
 2. **Parallel agent solving**: Solutions are developed by independent AI agents working in parallel, each implementing the solution in their assigned language without seeing other implementations. When all agents converge on the same answer, we have high confidence in correctness.
 
@@ -21,8 +21,8 @@ This project takes a unique approach to Advent of Code:
 
 | Day | Stars | Languages |
 |-----|-------|-----------|
-| 1   | ⭐⭐   | C, C++, Rust, Go, Node.js, Python, PHP, Perl, Bash, Clojure, Common Lisp, Brainfuck |
-| 2   | ⭐⭐   | C, C++, Rust, Go, Node.js, Python, PHP, Perl, Bash, Clojure, Common Lisp, Brainfuck |
+| 1   | ⭐⭐   | ARM64, C, C++, Rust, Go, Node.js, Python, PHP, Perl, Bash, Clojure, Common Lisp, Brainfuck |
+| 2   | ⭐⭐   | ARM64, C, C++, Rust, Go, Node.js, Python, PHP, Perl, Bash, Clojure, Common Lisp, Brainfuck |
 
 ## Benchmarks
 
@@ -34,6 +34,7 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs. Tim
 |-------------|--------------|-------------|
 | C           | 6.9          | 1.9         |
 | C++         | 6.9          | 1.9         |
+| ARM64 asm   | 7.0          | 1.9         |
 | Rust        | 7.3          | 1.9         |
 | Go          | 8.3          | 4.2         |
 | Perl        | 16.1         | 5.4         |
@@ -49,6 +50,7 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs. Tim
 
 | Language    | Runtime (ms) | Memory (MB) |
 |-------------|--------------|-------------|
+| ARM64 asm   | 65           | 1.9         |
 | Rust        | 136          | 1.9         |
 | C++         | 198          | 1.9         |
 | C           | 211          | 1.9         |
@@ -75,6 +77,7 @@ advent2025/
 └── dayXX/
     ├── problem.md         # Extracted problem statement
     ├── input.txt          # Puzzle input
+    ├── arm64/solution.s   # ARM64 assembly (macOS)
     ├── c/solution.c
     ├── cpp/solution.cpp
     ├── rust/src/main.rs
@@ -112,6 +115,7 @@ node runner/extract.js --day 1
 
 ```bash
 # Compiled languages (build first)
+cd day01/arm64 && make && ./solution    # ARM64 assembly (macOS only)
 gcc -O2 -o solution day01/c/solution.c && ./solution
 g++ -std=c++17 -O2 -o solution day01/cpp/solution.cpp && ./solution
 cd day01/rust && cargo run --release
