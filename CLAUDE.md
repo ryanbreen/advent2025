@@ -73,6 +73,37 @@ console.log('Part 2:', part2());
 
 This ensures we can always verify both parts of any day's solution at any time.
 
+## IMPORTANT: Agent Tasking Guidelines
+
+When dispatching agents to implement solutions in new languages:
+
+**DO NOT provide expected outputs or answers to the agent.**
+
+Agents must work honestly from the problem description and algorithm logic alone. Providing expected answers creates the risk of:
+- Agents gaming their output to match expected values
+- Hardcoded answers instead of genuine implementations
+- False confidence that a solution is correct
+
+**Correct approach:**
+- Point agents to the `problem.md` file for the problem description
+- Reference existing implementations for algorithm logic
+- Let agents run their solution and report what output they get
+- Verify correctness yourself by comparing against known-good implementations
+
+**Example - DO NOT do this:**
+```
+Implement Day 1 in Go.
+Expected output: Part 1: 1150, Part 2: 6738
+```
+
+**Example - DO this:**
+```
+Implement Day 1 in Go.
+Read day01/problem.md for the problem description.
+Reference day01/python/solution.py for the algorithm.
+Run your solution and report the output.
+```
+
 ## Playwright Session Management
 - Session state stored in `runner/auth-state.json`
 - User manually logs in via GitHub on first run
