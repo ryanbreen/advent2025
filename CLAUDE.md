@@ -116,18 +116,19 @@ Every solution must be benchmarked after implementation. When an agent completes
    - **CPU**: User + System time (in seconds)
 
 **Benchmark command format:**
-```bash
-# For interpreted languages
-/usr/bin/time -l python3 solution.py 2>&1
 
-# For compiled languages (compile first, then benchmark the run)
-/usr/bin/time -l ./solution 2>&1
+Use the high-precision benchmark script for accurate millisecond timing:
+```bash
+# From the project root - runs command 3-5 times and averages
+python3 runner/benchmark.py "cd day01/c && ./solution" 5
+python3 runner/benchmark.py "cd day01/python && python3 solution.py" 5
 ```
 
-**Extracting metrics from output:**
-- Runtime: `X.XX real` line (first number)
-- Memory: `peak memory footprint` line (convert bytes to MB by dividing by 1048576)
-- CPU: Sum of `user` + `sys` times
+The script outputs:
+- Average runtime in milliseconds
+- Standard deviation
+- Min/Max times
+- Peak memory usage
 
 **Updating README.md:**
 After benchmarking, update the appropriate table in README.md with the results. Each day has a benchmark table organized by language showing Part 1+2 combined performance.

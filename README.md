@@ -26,39 +26,39 @@ This project takes a unique approach to Advent of Code:
 
 ## Benchmarks
 
-All benchmarks run on Apple Silicon (M-series), measuring wall-clock time, peak memory, and CPU time.
+All benchmarks run on Apple Silicon (M-series), averaged over multiple runs. Times shown in milliseconds for precision.
 
 ### Day 1: Secret Entrance
 
-| Language | Runtime (s) | Memory (MB) | CPU (s) |
-|----------|-------------|-------------|---------|
-| C        | 0.00        | 0.94        | 0.00    |
-| C++      | 0.00        | 1.05        | 0.00    |
-| Rust     | 0.00        | 1.13        | 0.00    |
-| Go       | 0.00        | 1.05        | 0.00    |
-| Perl     | 0.01        | 3.23        | 0.00    |
-| Brainfuck| 0.02        | 7.08        | 0.01    |
-| Lisp     | 0.02        | 38.93       | 0.01    |
-| Python   | 0.04        | 8.08        | 0.01    |
-| Node.js  | 0.04        | 12.99       | 0.03    |
-| Bash     | 0.08        | 1.42        | 0.08    |
-| Clojure  | 0.45        | 126.84      | 1.22    |
+| Language    | Runtime (ms) | Memory (MB) |
+|-------------|--------------|-------------|
+| C           | 6.9          | 1.9         |
+| C++         | 6.9          | 1.9         |
+| Rust        | 7.3          | 1.9         |
+| Go          | 8.3          | 4.2         |
+| Perl        | 16.1         | 5.4         |
+| Lisp        | 27.5         | 39.7        |
+| Brainfuck   | 29.2         | 14.8        |
+| Python      | 30.8         | 16.1        |
+| Node.js     | 50.9         | 41.5        |
+| Bash        | 98.6         | 2.2         |
+| Clojure     | 491.7        | 150.1       |
 
 ### Day 2: Gift Shop
 
-| Language | Runtime (s) | Memory (MB) | CPU (s) |
-|----------|-------------|-------------|---------|
-| Rust     | 0.12        | 1.00        | 0.12    |
-| C        | 0.14        | 0.94        | 0.14    |
-| C++      | 0.17        | 0.94        | 0.17    |
-| Go       | 0.19        | 8.08        | 0.19    |
-| Node.js  | 0.27        | 59.82       | 0.28    |
-| Lisp     | 0.54        | 88.83       | 0.52    |
-| Brainfuck| 1.05        | 6.97        | 1.04    |
-| Python   | 1.09        | 7.75        | 1.08    |
-| Clojure  | 1.16        | 1277.32     | 2.20    |
-| Perl     | 2.20        | 2.24        | 2.20    |
-| Bash     | 90.93       | 1.52        | 90.52   |
+| Language    | Runtime (ms) | Memory (MB) |
+|-------------|--------------|-------------|
+| Rust        | 136          | 1.9         |
+| C++         | 198          | 1.9         |
+| C           | 211          | 1.9         |
+| Go          | 217          | 10.0        |
+| Node.js     | 315          | 87.6        |
+| Lisp        | 587          | 89.4        |
+| Brainfuck   | 1,131        | 14.8        |
+| Python      | 1,192        | 15.6        |
+| Clojure     | 1,210        | 1,298       |
+| Perl        | 2,461        | 4.3         |
+| Bash        | 90,930       | 1.5         |
 
 ## Project Structure
 
