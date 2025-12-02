@@ -3,27 +3,35 @@
 #include <string.h>
 #include <stdbool.h>
 
-// Check if a number is "invalid" - made of a sequence of digits repeated twice
+// Check if a number is "invalid" - made of a sequence of digits repeated at least twice
 bool is_invalid_id(long long num) {
     char str[32];
     sprintf(str, "%lld", num);
     int len = strlen(str);
 
-    // Must have even length to be repeated twice
-    if (len % 2 != 0) {
-        return false;
-    }
+    // Try all possible pattern lengths (from 1 to len/2)
+    // The pattern must repeat at least twice, so max pattern length is len/2
+    for (int pattern_len = 1; pattern_len <= len / 2; pattern_len++) {
+        // Check if the string length is divisible by pattern length
+        if (len % pattern_len != 0) {
+            continue;
+        }
 
-    int half_len = len / 2;
+        // Check if the entire string is made of this pattern repeated
+        bool is_repeated = true;
+        for (int i = pattern_len; i < len; i++) {
+            if (str[i] != str[i % pattern_len]) {
+                is_repeated = false;
+                break;
+            }
+        }
 
-    // Check if first half equals second half
-    for (int i = 0; i < half_len; i++) {
-        if (str[i] != str[half_len + i]) {
-            return false;
+        if (is_repeated) {
+            return true;
         }
     }
 
-    return true;
+    return false;
 }
 
 int main() {

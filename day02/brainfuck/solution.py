@@ -1,21 +1,26 @@
 #!/usr/bin/env python3
 """
-Advent of Code 2025 Day 2 Part 1
-Find invalid product IDs (numbers that are a sequence repeated twice)
+Advent of Code 2025 Day 2 Part 2
+Find invalid product IDs (numbers that are a sequence repeated at least twice)
 """
 
 def is_invalid_id(n):
-    """Check if a number is invalid (some digit sequence repeated twice)"""
+    """Check if a number is invalid (some digit sequence repeated at least twice)"""
     s = str(n)
     length = len(s)
 
-    # Can't be repeated if odd length
-    if length % 2 != 0:
-        return False
+    # Try all possible pattern lengths (from 1 to length//2)
+    # If the string is a pattern repeated at least twice,
+    # the pattern length must be at most half the string length
+    for pattern_len in range(1, length // 2 + 1):
+        # Check if the string length is divisible by the pattern length
+        if length % pattern_len == 0:
+            pattern = s[:pattern_len]
+            # Check if the entire string is this pattern repeated
+            if pattern * (length // pattern_len) == s:
+                return True
 
-    # Check if first half equals second half
-    mid = length // 2
-    return s[:mid] == s[mid:]
+    return False
 
 def solve(input_text):
     """Solve the puzzle"""
@@ -51,7 +56,7 @@ def main():
     answer, count = solve(input_text)
 
     print(f"Found {count} invalid IDs")
-    print(f"Part 1 Answer: {answer}")
+    print(f"Part 2 Answer: {answer}")
 
 if __name__ == '__main__':
     main()

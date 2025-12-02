@@ -44,6 +44,35 @@ Each day has two parts:
 
 Both parts typically use the same input but ask different questions.
 
+## IMPORTANT: Preserving Part 1 When Implementing Part 2
+
+**DO NOT delete or modify Part 1 code when adding Part 2.**
+
+Each solution file must be able to run BOTH parts independently. When implementing Part 2:
+- Keep the `part1()` function intact and working
+- Add a separate `part2()` function for the new logic
+- The solution should output both answers when run
+
+Example structure:
+```javascript
+// Part 1
+function part1() {
+  // Original Part 1 logic - DO NOT MODIFY
+  return answer1;
+}
+
+// Part 2
+function part2() {
+  // New Part 2 logic
+  return answer2;
+}
+
+console.log('Part 1:', part1());
+console.log('Part 2:', part2());
+```
+
+This ensures we can always verify both parts of any day's solution at any time.
+
 ## Playwright Session Management
 - Session state stored in `runner/auth-state.json`
 - User manually logs in via GitHub on first run

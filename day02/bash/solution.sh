@@ -1,23 +1,35 @@
 #!/usr/bin/env bash
 
-# Function to check if a number is invalid (repeated pattern)
+# Function to check if a number is invalid (repeated pattern at least twice)
 is_invalid() {
     local num="$1"
     local len=${#num}
 
-    # Only even-length numbers can be repeated patterns
-    if (( len % 2 != 0 )); then
-        return 1
-    fi
+    # Try all possible pattern lengths (from 1 to len/2)
+    for ((pattern_len=1; pattern_len<=len/2; pattern_len++)); do
+        # Check if the number length is divisible by pattern length
+        if (( len % pattern_len == 0 )); then
+            local pattern="${num:0:$pattern_len}"
+            local is_match=1
 
-    local half=$((len / 2))
-    local first_half="${num:0:$half}"
-    local second_half="${num:$half:$half}"
+            # Check if the entire number is made of this pattern repeated
+            for ((i=pattern_len; i<len; i+=pattern_len)); do
+                local segment="${num:$i:$pattern_len}"
+                if [[ "$segment" != "$pattern" ]]; then
+                    is_match=0
+                    break
+                fi
+            done
 
-    # Check if the two halves are identical
-    if [[ "$first_half" == "$second_half" ]]; then
-        return 0
-    fi
+            # If we found a matching pattern and it repeats at least twice
+            if (( is_match == 1 )); then
+                local repeats=$((len / pattern_len))
+                if (( repeats >= 2 )); then
+                    return 0
+                fi
+            fi
+        fi
+    done
 
     return 1
 }

@@ -46,10 +46,48 @@ function part1() {
   return sum;
 }
 
+// Check if a number is invalid (pattern repeated at least twice)
+function isInvalidIDPart2(num) {
+  const str = num.toString();
+  const len = str.length;
+
+  // Try all possible pattern lengths from 1 to len/2
+  for (let patternLen = 1; patternLen <= len / 2; patternLen++) {
+    // Check if the string can be divided evenly by this pattern length
+    if (len % patternLen === 0) {
+      const pattern = str.substring(0, patternLen);
+      const repetitions = len / patternLen;
+
+      // Check if repeating the pattern creates the full string
+      if (repetitions >= 2 && pattern.repeat(repetitions) === str) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 // Part 2
 function part2() {
-  // TODO: Implement
-  return null;
+  // Parse the comma-separated ranges
+  const ranges = input.split(',').map(range => {
+    const [start, end] = range.split('-').map(Number);
+    return { start, end };
+  });
+
+  let sum = 0;
+
+  // Check each range for invalid IDs
+  for (const { start, end } of ranges) {
+    for (let id = start; id <= end; id++) {
+      if (isInvalidIDPart2(id)) {
+        sum += id;
+      }
+    }
+  }
+
+  return sum;
 }
 
 console.log('Part 1:', part1());

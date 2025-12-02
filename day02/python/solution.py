@@ -51,8 +51,44 @@ def part1():
 
 
 def part2():
-    # TODO: Implement
-    return None
+    def is_invalid_id(num: int) -> bool:
+        """Check if a number is invalid (a pattern repeated at least twice)."""
+        s = str(num)
+        length = len(s)
+
+        # Check if it starts with 0 (leading zeros not allowed)
+        if s[0] == '0':
+            return False
+
+        # Try all possible pattern lengths from 1 to length//2
+        # The pattern must be repeated at least twice, so max pattern length is length//2
+        for pattern_length in range(1, length // 2 + 1):
+            # Check if the string length is divisible by pattern_length
+            if length % pattern_length == 0:
+                pattern = s[:pattern_length]
+                # Check if repeating the pattern gives us the original string
+                if pattern * (length // pattern_length) == s:
+                    return True
+
+        return False
+
+    # Parse ranges from input
+    ranges = []
+    for part in input_text.split(','):
+        part = part.strip()
+        if '-' in part:
+            parts = part.split('-')
+            if len(parts) == 2:
+                start, end = int(parts[0]), int(parts[1])
+                ranges.append((start, end))
+
+    total = 0
+    for start, end in ranges:
+        for num in range(start, end + 1):
+            if is_invalid_id(num):
+                total += num
+
+    return total
 
 
 if __name__ == "__main__":
