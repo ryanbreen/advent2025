@@ -1,11 +1,28 @@
 #!/usr/bin/env python3
 """
-Advent of Code 2025 Day 2 Part 2
-Find invalid product IDs (numbers that are a sequence repeated at least twice)
+Advent of Code 2025 Day 2
+Find invalid product IDs
+Part 1: pattern repeated EXACTLY twice
+Part 2: pattern repeated AT LEAST twice
 """
 
-def is_invalid_id(n):
-    """Check if a number is invalid (some digit sequence repeated at least twice)"""
+def is_invalid_id_part1(n):
+    """Check if a number is invalid (pattern repeated EXACTLY twice)"""
+    s = str(n)
+    length = len(s)
+
+    # Must be even length to be repeated exactly twice
+    if length % 2 != 0:
+        return False
+
+    half = length // 2
+    first_half = s[:half]
+    second_half = s[half:]
+
+    return first_half == second_half
+
+def is_invalid_id_part2(n):
+    """Check if a number is invalid (pattern repeated at least twice)"""
     s = str(n)
     length = len(s)
 
@@ -35,17 +52,18 @@ def solve(input_text):
         start, end = map(int, range_str.split('-'))
         ranges.append((start, end))
 
-    # Find all invalid IDs
-    total = 0
-    invalid_count = 0
+    # Find all invalid IDs for both parts
+    part1_total = 0
+    part2_total = 0
 
     for start, end in ranges:
         for num in range(start, end + 1):
-            if is_invalid_id(num):
-                total += num
-                invalid_count += 1
+            if is_invalid_id_part1(num):
+                part1_total += num
+            if is_invalid_id_part2(num):
+                part2_total += num
 
-    return total, invalid_count
+    return part1_total, part2_total
 
 def main():
     # Read input
@@ -53,10 +71,10 @@ def main():
         input_text = f.read()
 
     # Solve
-    answer, count = solve(input_text)
+    part1, part2 = solve(input_text)
 
-    print(f"Found {count} invalid IDs")
-    print(f"Part 2 Answer: {answer}")
+    print(f"Part 1: {part1}")
+    print(f"Part 2: {part2}")
 
 if __name__ == '__main__':
     main()

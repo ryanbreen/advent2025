@@ -3,8 +3,30 @@
 #include <string.h>
 #include <stdbool.h>
 
-// Check if a number is "invalid" - made of a sequence of digits repeated at least twice
-bool is_invalid_id(long long num) {
+// Part 1: Check if a number is "invalid" - made of a pattern repeated EXACTLY twice
+bool is_invalid_id_part1(long long num) {
+    char str[32];
+    sprintf(str, "%lld", num);
+    int len = strlen(str);
+
+    // Must be even length to be repeated exactly twice
+    if (len % 2 != 0) {
+        return false;
+    }
+
+    int half = len / 2;
+    // Check if first half equals second half
+    for (int i = 0; i < half; i++) {
+        if (str[i] != str[half + i]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+// Part 2: Check if a number is "invalid" - made of a pattern repeated at least twice
+bool is_invalid_id_part2(long long num) {
     char str[32];
     sprintf(str, "%lld", num);
     int len = strlen(str);
@@ -52,7 +74,11 @@ int main() {
         return 1;
     }
 
-    long long total_sum = 0;
+    // Make a copy of the line for the second pass
+    char *line_copy = strdup(line);
+
+    long long part1_sum = 0;
+    long long part2_sum = 0;
 
     // Parse ranges separated by commas
     char *token = strtok(line, ",");
@@ -62,16 +88,21 @@ int main() {
         if (sscanf(token, "%lld-%lld", &start, &end) == 2) {
             // Check each number in the range
             for (long long num = start; num <= end; num++) {
-                if (is_invalid_id(num)) {
-                    total_sum += num;
+                if (is_invalid_id_part1(num)) {
+                    part1_sum += num;
+                }
+                if (is_invalid_id_part2(num)) {
+                    part2_sum += num;
                 }
             }
         }
         token = strtok(NULL, ",");
     }
 
-    printf("Total sum of invalid IDs: %lld\n", total_sum);
+    printf("Part 1: %lld\n", part1_sum);
+    printf("Part 2: %lld\n", part2_sum);
 
     free(line);
+    free(line_copy);
     return 0;
 }

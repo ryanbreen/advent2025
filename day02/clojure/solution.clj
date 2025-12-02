@@ -1,7 +1,20 @@
 (ns solution
   (:require [clojure.string :as str]))
 
-(defn invalid-id?
+;; Part 1: Check if a number is an invalid ID (pattern repeated EXACTLY twice)
+(defn invalid-id-part1?
+  "Check if a number is an invalid ID (a sequence of digits repeated exactly twice)."
+  [n]
+  (let [s (str n)
+        len (count s)]
+    (when (and (pos? len) (even? len))
+      (let [half (quot len 2)
+            first-half (subs s 0 half)
+            second-half (subs s half)]
+        (= first-half second-half)))))
+
+;; Part 2: Check if a number is an invalid ID (pattern repeated at least twice)
+(defn invalid-id-part2?
   "Check if a number is an invalid ID (a sequence of digits repeated at least twice)."
   [n]
   (let [s (str n)
@@ -19,11 +32,11 @@
                        (= s (apply str (repeat repetitions pattern)))))))
             (range 1 (inc (quot len 2)))))))
 
-(defn count-invalid-ids-in-range
-  "Count and sum all invalid IDs in the range [start, end]."
-  [start end]
+(defn sum-invalid-ids-in-range
+  "Sum all invalid IDs in the range [start, end] using the given predicate."
+  [pred start end]
   (reduce (fn [sum n]
-            (if (invalid-id? n)
+            (if (pred n)
               (+ sum n)
               sum))
           0
@@ -37,20 +50,22 @@
 
 (defn solve
   "Solve the problem by parsing input and summing all invalid IDs."
-  [input]
+  [input pred]
   (let [ranges (-> input
                    str/trim
                    (str/split #","))
         invalid-sum (reduce (fn [total range-str]
                               (let [[start end] (parse-range range-str)]
-                                (+ total (count-invalid-ids-in-range start end))))
+                                (+ total (sum-invalid-ids-in-range pred start end))))
                             0
                             ranges)]
     invalid-sum))
 
 (defn -main []
   (let [input (slurp "/Users/wrb/fun/code/advent2025/day02/input.txt")
-        answer (solve input)]
-    (println "Part 2 Answer:" answer)))
+        part1 (solve input invalid-id-part1?)
+        part2 (solve input invalid-id-part2?)]
+    (println "Part 1:" part1)
+    (println "Part 2:" part2)))
 
 (-main)

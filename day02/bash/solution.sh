@@ -1,7 +1,29 @@
 #!/usr/bin/env bash
 
-# Function to check if a number is invalid (repeated pattern at least twice)
-is_invalid() {
+# Part 1: Check if a number is invalid (pattern repeated EXACTLY twice)
+is_invalid_part1() {
+    local num="$1"
+    local len=${#num}
+
+    # Must be even length to be repeated exactly twice
+    if (( len % 2 != 0 )); then
+        return 1
+    fi
+
+    local half=$((len / 2))
+    local first_half="${num:0:$half}"
+    local second_half="${num:$half:$half}"
+
+    # Check if both halves are identical
+    if [[ "$first_half" == "$second_half" ]]; then
+        return 0
+    fi
+
+    return 1
+}
+
+# Part 2: Check if a number is invalid (pattern repeated at least twice)
+is_invalid_part2() {
     local num="$1"
     local len=${#num}
 
@@ -43,7 +65,8 @@ input=$(echo "$input" | tr -d '\n')
 # Split by commas
 IFS=',' read -ra ranges <<< "$input"
 
-total=0
+part1_total=0
+part2_total=0
 
 # Process each range
 for range in "${ranges[@]}"; do
@@ -57,10 +80,14 @@ for range in "${ranges[@]}"; do
 
     # Iterate through all numbers in the range
     for ((num=start; num<=end; num++)); do
-        if is_invalid "$num"; then
-            total=$((total + num))
+        if is_invalid_part1 "$num"; then
+            part1_total=$((part1_total + num))
+        fi
+        if is_invalid_part2 "$num"; then
+            part2_total=$((part2_total + num))
         fi
     done
 done
 
-echo "$total"
+echo "Part 1: $part1_total"
+echo "Part 2: $part2_total"

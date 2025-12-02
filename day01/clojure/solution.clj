@@ -26,7 +26,21 @@
                        (zero? pos)))
                    clicks))))
 
-(defn count-zeros [rotations]
+;; Part 1: Count how many times the dial ends at 0 after a rotation
+(defn solve-part1 [rotations]
+  "Count how many times the dial ends at 0 after any rotation."
+  (loop [position 50
+         remaining rotations
+         zero-count 0]
+    (if (empty? remaining)
+      zero-count
+      (let [[direction distance] (first remaining)
+            new-position (rotate-dial position direction distance)
+            new-count (if (zero? new-position) (inc zero-count) zero-count)]
+        (recur new-position (rest remaining) new-count)))))
+
+;; Part 2: Count how many times the dial passes through 0 during all rotations
+(defn solve-part2 [rotations]
   "Count how many times the dial passes through 0 during all rotations."
   (loop [position 50
          remaining rotations
@@ -38,17 +52,19 @@
             new-position (rotate-dial position direction distance)]
         (recur new-position (rest remaining) (+ zero-count zeros-in-rotation))))))
 
-(defn solve [input]
-  "Solve the safe dial problem."
+(defn parse-input [input]
+  "Parse input into list of rotations."
   (->> input
        str/split-lines
        (remove str/blank?)
-       (map parse-rotation)
-       count-zeros))
+       (map parse-rotation)))
 
 (defn -main []
   (let [input (slurp "/Users/wrb/fun/code/advent2025/day01/input.txt")
-        answer (solve input)]
-    (println "Part 2 Answer:" answer)))
+        rotations (parse-input input)
+        part1 (solve-part1 rotations)
+        part2 (solve-part2 rotations)]
+    (println "Part 1:" part1)
+    (println "Part 2:" part2)))
 
 (-main)
