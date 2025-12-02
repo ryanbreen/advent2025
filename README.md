@@ -58,7 +58,7 @@ All benchmarks run on Apple Silicon (M-series), measuring wall-clock time, peak 
 | Python   | 1.09        | 7.75        | 1.08    |
 | Clojure  | 1.16        | 1277.32     | 2.20    |
 | Perl     | 2.20        | 2.24        | 2.20    |
-| Bash     | 139.85      | 1.55        | 139.42  |
+| Bash     | 90.93       | 1.52        | 90.52   |
 
 ## Project Structure
 
