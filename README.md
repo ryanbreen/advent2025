@@ -6,7 +6,7 @@ Solutions to [Advent of Code 2025](https://adventofcode.com/2025) implemented in
 
 This project takes a unique approach to Advent of Code:
 
-1. **Multi-language solutions**: Each day's puzzle is solved in 17 languages (ARM64 Assembly, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion, and Brainfuck) to validate correctness through independent implementations.
+1. **Multi-language solutions**: Each day's puzzle is solved in 16 languages (ARM64 Assembly, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, and ColdFusion) to validate correctness through independent implementations.
 
 2. **Parallel agent solving**: Solutions are developed by independent AI agents working in parallel, each implementing the solution in their assigned language without seeing other implementations. When all agents converge on the same answer, we have high confidence in correctness.
 
@@ -21,8 +21,9 @@ This project takes a unique approach to Advent of Code:
 
 | Day | Stars | Languages |
 |-----|-------|-----------|
-| 1   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion, Brainfuck |
-| 2   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion, Brainfuck |
+| 1   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
+| 2   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
+| 3   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 
 ## Benchmarks
 
@@ -42,7 +43,6 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs. Tim
 | Go          | 8.3          | 4.2         |
 | Perl        | 16.1         | 5.4         |
 | Lisp        | 27.5         | 39.7        |
-| Brainfuck   | 29.2         | 14.8        |
 | Python      | 30.8         | 16.1        |
 | Java        | 43.2         | 45.5        |
 | Node.js     | 50.9         | 41.5        |
@@ -66,13 +66,33 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs. Tim
 | Node.js     | 315          | 87.6        |
 | Lisp        | 587          | 89.4        |
 | PHP         | 610          | 24.4        |
-| Brainfuck   | 1,131        | 14.8        |
 | Python      | 1,192        | 15.6        |
 | Clojure     | 1,210        | 1,298       |
 | Ruby        | 2,092        | 28.2        |
 | Perl        | 2,461        | 4.3         |
 | ColdFusion  | 6,909.3      | 1,141.8     |
 | Bash        | 90,930       | 1.5         |
+
+### Day 3: Lobby
+
+| Language    | Runtime (ms) | Memory (MB) |
+|-------------|--------------|-------------|
+| C++         | 6.4          | 1.9         |
+| C           | 6.5          | 1.9         |
+| ARM64 asm   | 6.5          | 1.9         |
+| Zig         | 9.3          | 1.9         |
+| Perl        | 22.7         | 4.6         |
+| Lisp        | 29.2         | 41.7        |
+| Python      | 34.9         | 15.6        |
+| Rust        | 49.0         | 1.9         |
+| Node.js     | 49.5         | 45.7        |
+| Java        | 66.7         | 47.1        |
+| PHP         | 67.2         | 24.6        |
+| Ruby        | 67.7         | 28.3        |
+| Go          | 103.3        | 59.7        |
+| Clojure     | 664.1        | 932.6       |
+| ColdFusion  | 2,808.6      | 1,080.5     |
+| Bash        | 7,360.1      | 1.9         |
 
 ## Project Structure
 
@@ -102,8 +122,7 @@ advent2025/
     ├── bash/solution.sh
     ├── clojure/solution.clj
     ├── lisp/solution.lisp
-    ├── coldfusion/solution.cfm
-    └── brainfuck/...
+    └── coldfusion/solution.cfm
 ```
 
 ## Running Solutions
@@ -161,7 +180,7 @@ The multi-language, parallel-agent approach serves several purposes:
 
 - **Verification**: When 3+ independent implementations in different languages produce the same answer, bugs are unlikely
 - **Learning**: Seeing the same algorithm expressed in different paradigms (functional Clojure, imperative C, pure Bash) is educational
-- **Fun**: Solving puzzles in Brainfuck or pure Bash is a entertaining challenge
+- **Fun**: Solving puzzles in pure Bash or ARM64 assembly is an entertaining challenge
 
 ---
 
