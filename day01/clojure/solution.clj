@@ -17,14 +17,30 @@
 
 (defn count-zeros-during-rotation [start direction distance]
   "Count how many times the dial passes through 0 during a rotation.
-   This includes the final position if it's 0."
-  (let [clicks (range 1 (inc distance))]
-    (count (filter (fn [click]
-                     (let [pos (if (= direction \L)
-                                 (mod (- start click) 100)
-                                 (mod (+ start click) 100))]
-                       (zero? pos)))
-                   clicks))))
+   Uses O(1) mathematical calculation instead of iterating through positions."
+  (if (= direction \L)
+    ;; Moving left (toward lower numbers)
+    ;; We hit 0 after exactly 'start' steps, then every 100 steps after that
+    (cond
+      (and (pos? start) (>= distance start))
+      (inc (quot (- distance start) 100))
+
+      (and (zero? start) (>= distance 100))
+      (quot distance 100)
+
+      :else 0)
+
+    ;; Moving right (toward higher numbers)
+    ;; We hit 0 after (100 - start) steps, then every 100 steps after that
+    (let [steps-to-zero (- 100 start)]
+      (cond
+        (and (pos? start) (>= distance steps-to-zero))
+        (inc (quot (- distance steps-to-zero) 100))
+
+        (and (zero? start) (>= distance 100))
+        (quot distance 100)
+
+        :else 0))))
 
 ;; Part 1: Count how many times the dial ends at 0 after a rotation
 (defn solve-part1 [rotations]

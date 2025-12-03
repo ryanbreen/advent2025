@@ -49,7 +49,7 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs. Tim
 | PHP         | 53.4         | 24.8        |
 | Ruby        | 59.5         | 28.7        |
 | Bash        | 98.6         | 2.2         |
-| Clojure     | 491.7        | 150.1       |
+| Clojure     | 431.0        | 132.8       |
 | ColdFusion  | 2,590.5      | 1,202.0     |
 
 ### Day 2: Gift Shop

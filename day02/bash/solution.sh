@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Read input efficiently
-input=$(<"/Users/wrb/fun/code/advent2025/day02/input.txt")
+input=$(<"../input.txt")
 input="${input//$'\n'/}"
 
 # Split by commas

@@ -57,7 +57,7 @@ bool is_invalid_id_part2(long long num) {
 }
 
 int main() {
-    FILE *fp = fopen("/Users/wrb/fun/code/advent2025/day02/input.txt", "r");
+    FILE *fp = fopen("../input.txt", "r");
     if (!fp) {
         fprintf(stderr, "Error opening input file\n");
         return 1;

@@ -62,7 +62,7 @@
     invalid-sum))
 
 (defn -main []
-  (let [input (slurp "/Users/wrb/fun/code/advent2025/day02/input.txt")
+  (let [input (slurp "../input.txt")
         part1 (solve input invalid-id-part1?)
         part2 (solve input invalid-id-part2?)]
     (println "Part 1:" part1)
