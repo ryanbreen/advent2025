@@ -15,46 +15,46 @@ const DIRECTIONS = [
   [1, -1],  [1, 0],  [1, 1]    // bottom-left, bottom, bottom-right
 ];
 
-// Count the number of adjacent rolls ('@') around position (row, col)
-function countAdjacentRolls(grid, row, col) {
-  const rows = grid.length;
-  const cols = grid[0].length;
-  let count = 0;
+// ============== PRECOMPUTE ROLL POSITIONS AND NEIGHBORS ==============
+const grid = lines;
+const rows = grid.length;
+const cols = grid[0].length;
 
-  for (const [dr, dc] of DIRECTIONS) {
-    const newRow = row + dr;
-    const newCol = col + dc;
+const rollPositions = [];   // Array of [r, c] for each roll
+const posToIndex = new Map();  // Map: "r,c" => index in rollPositions
+const rollNeighbors = [];   // Array of arrays: neighbors for each roll
 
-    // Check if neighbor is within bounds and is a paper roll
-    if (newRow >= 0 && newRow < rows &&
-        newCol >= 0 && newCol < cols &&
-        grid[newRow][newCol] === '@') {
-      count++;
+for (let r = 0; r < rows; r++) {
+  for (let c = 0; c < cols; c++) {
+    if (grid[r][c] === '@') {
+      const idx = rollPositions.length;
+      rollPositions.push([r, c]);
+      posToIndex.set(`${r},${c}`, idx);
+
+      // Precompute neighbors for this roll
+      const neighbors = [];
+      for (const [dr, dc] of DIRECTIONS) {
+        const nr = r + dr;
+        const nc = c + dc;
+        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && grid[nr][nc] === '@') {
+          neighbors.push(`${nr},${nc}`);
+        }
+      }
+      rollNeighbors.push(neighbors);
     }
   }
-
-  return count;
 }
+
+const numRolls = rollPositions.length;
 
 // Part 1
 function part1() {
-  const grid = lines.map(line => line.split(''));
-  const rows = grid.length;
-  const cols = grid[0].length;
-
   let accessibleCount = 0;
 
-  // Check each cell in the grid
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      // Only count if this cell contains a paper roll
-      if (grid[row][col] === '@') {
-        const adjacentRolls = countAdjacentRolls(grid, row, col);
-        // A roll is accessible if it has fewer than 4 adjacent rolls
-        if (adjacentRolls < 4) {
-          accessibleCount++;
-        }
-      }
+  for (let i = 0; i < numRolls; i++) {
+    const neighborCount = rollNeighbors[i].length;
+    if (neighborCount < 4) {
+      accessibleCount++;
     }
   }
 
@@ -63,42 +63,70 @@ function part1() {
 
 // Part 2
 function part2() {
-  // Create a mutable copy of the grid
-  const grid = lines.map(line => line.split(''));
-  const rows = grid.length;
-  const cols = grid[0].length;
+  // Track which rolls are still active
+  const active = new Set();
+  for (let i = 0; i < numRolls; i++) {
+    const [r, c] = rollPositions[i];
+    active.add(`${r},${c}`);
+  }
 
+  // Compute initial neighbor counts
+  const neighborCount = new Array(numRolls);
+  for (let i = 0; i < numRolls; i++) {
+    let count = 0;
+    for (const neighborPos of rollNeighbors[i]) {
+      if (active.has(neighborPos)) {
+        count++;
+      }
+    }
+    neighborCount[i] = count;
+  }
+
+  // Initialize queue with accessible rolls (neighbor count < 4)
+  let queue = [];
+  const inQueue = new Set();
+  for (let i = 0; i < numRolls; i++) {
+    if (neighborCount[i] < 4) {
+      queue.push(i);
+      inQueue.add(i);
+    }
+  }
+
+  // Process queue
   let totalRemoved = 0;
 
-  // Loop until no more rolls can be removed
-  while (true) {
-    // Find all rolls with fewer than 4 adjacent rolls
-    const rollsToRemove = [];
+  while (queue.length > 0) {
+    const nextQueue = [];
 
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        // Only check cells that still contain a paper roll
-        if (grid[row][col] === '@') {
-          const adjacentRolls = countAdjacentRolls(grid, row, col);
-          // A roll can be removed if it has fewer than 4 adjacent rolls
-          if (adjacentRolls < 4) {
-            rollsToRemove.push([row, col]);
+    for (const idx of queue) {
+      const [r, c] = rollPositions[idx];
+      const posKey = `${r},${c}`;
+
+      // Skip if already removed
+      if (!active.has(posKey)) {
+        continue;
+      }
+
+      // Remove this roll
+      active.delete(posKey);
+      totalRemoved++;
+
+      // Update neighbors' counts
+      for (const neighborPos of rollNeighbors[idx]) {
+        if (active.has(neighborPos)) {
+          const neighborIdx = posToIndex.get(neighborPos);
+          neighborCount[neighborIdx]--;
+
+          // Add to queue if now accessible and not already queued
+          if (neighborCount[neighborIdx] < 4 && !inQueue.has(neighborIdx)) {
+            nextQueue.push(neighborIdx);
+            inQueue.add(neighborIdx);
           }
         }
       }
     }
 
-    // If no rolls can be removed, we're done
-    if (rollsToRemove.length === 0) {
-      break;
-    }
-
-    // Remove all accessible rolls
-    for (const [row, col] of rollsToRemove) {
-      grid[row][col] = '.';  // Mark as empty
-    }
-
-    totalRemoved += rollsToRemove.length;
+    queue = nextQueue;
   }
 
   return totalRemoved;

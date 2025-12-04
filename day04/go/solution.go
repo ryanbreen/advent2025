@@ -96,20 +96,63 @@ func part2(grid [][]rune) int {
 		copy(gridCopy[i], grid[i])
 	}
 
+	rows := len(gridCopy)
+	cols := len(gridCopy[0])
+
+	// Precompute neighbor counts for all rolls
+	neighborCount := make([][]int, rows)
+	for i := range neighborCount {
+		neighborCount[i] = make([]int, cols)
+	}
+
+	for r := 0; r < rows; r++ {
+		for c := 0; c < cols; c++ {
+			if gridCopy[r][c] == '@' {
+				neighborCount[r][c] = countNeighbors(gridCopy, r, c)
+			}
+		}
+	}
+
+	// Initialize queue with all accessible rolls (< 4 neighbors)
+	queue := make([][2]int, 0, rows*cols)
+	for r := 0; r < rows; r++ {
+		for c := 0; c < cols; c++ {
+			if gridCopy[r][c] == '@' && neighborCount[r][c] < 4 {
+				queue = append(queue, [2]int{r, c})
+			}
+		}
+	}
+
 	totalRemoved := 0
 
-	for {
-		accessible := findAccessibleRolls(gridCopy)
-		if len(accessible) == 0 {
-			break
+	// Process queue
+	for len(queue) > 0 {
+		pos := queue[0]
+		queue = queue[1:]
+		r, c := pos[0], pos[1]
+
+		// Skip if already removed
+		if gridCopy[r][c] != '@' {
+			continue
 		}
 
-		// Remove all accessible rolls
-		for _, pos := range accessible {
-			gridCopy[pos[0]][pos[1]] = '.'
-		}
+		// Remove this roll
+		gridCopy[r][c] = '.'
+		totalRemoved++
 
-		totalRemoved += len(accessible)
+		// Decrement neighbor counts for all adjacent rolls
+		for _, dir := range directions {
+			nr := r + dir[0]
+			nc := c + dir[1]
+
+			if nr >= 0 && nr < rows && nc >= 0 && nc < cols && gridCopy[nr][nc] == '@' {
+				neighborCount[nr][nc]--
+				// If this neighbor just became accessible, add to queue
+				if neighborCount[nr][nc] == 3 {
+					queue = append(queue, [2]int{nr, nc})
+				}
+			}
+		}
 	}
 
 	return totalRemoved

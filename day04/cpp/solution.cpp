@@ -57,34 +57,56 @@ int part2(const vector<string>& lines) {
     vector<string> grid = lines;
     int rows = grid.size();
     int cols = grid[0].size();
+
+    // Precompute neighbor counts for all rolls
+    vector<vector<int>> neighborCount(rows, vector<int>(cols, 0));
+    for (int r = 0; r < rows; r++) {
+        for (int c = 0; c < cols; c++) {
+            if (grid[r][c] == '@') {
+                neighborCount[r][c] = countAdjacentRolls(grid, r, c);
+            }
+        }
+    }
+
+    // Initialize queue with all accessible rolls (< 4 neighbors)
+    vector<pair<int, int>> queue;
+    for (int r = 0; r < rows; r++) {
+        for (int c = 0; c < cols; c++) {
+            if (grid[r][c] == '@' && neighborCount[r][c] < 4) {
+                queue.push_back({r, c});
+            }
+        }
+    }
+
     int total_removed = 0;
+    size_t queue_index = 0;
 
-    while (true) {
-        // Find all rolls that can be removed in this iteration
-        vector<pair<int, int>> removable;
+    // Process queue
+    while (queue_index < queue.size()) {
+        auto [r, c] = queue[queue_index++];
 
-        for (int r = 0; r < rows; r++) {
-            for (int c = 0; c < cols; c++) {
-                if (grid[r][c] == '@') {
-                    int adjacent = countAdjacentRolls(grid, r, c);
-                    if (adjacent < 4) {
-                        removable.push_back({r, c});
-                    }
+        // Skip if already removed
+        if (grid[r][c] != '@') {
+            continue;
+        }
+
+        // Remove this roll
+        grid[r][c] = '.';
+        total_removed++;
+
+        // Decrement neighbor counts for all adjacent rolls
+        for (int i = 0; i < 8; i++) {
+            int nr = r + directions[i][0];
+            int nc = c + directions[i][1];
+
+            if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && grid[nr][nc] == '@') {
+                neighborCount[nr][nc]--;
+                // If this neighbor just became accessible, add to queue
+                if (neighborCount[nr][nc] == 3) {
+                    queue.push_back({nr, nc});
                 }
             }
         }
-
-        // If no rolls can be removed, we're done
-        if (removable.empty()) {
-            break;
-        }
-
-        // Remove all accessible rolls
-        for (const auto& pos : removable) {
-            grid[pos.first][pos.second] = '.';
-        }
-
-        total_removed += removable.size();
     }
 
     return total_removed;

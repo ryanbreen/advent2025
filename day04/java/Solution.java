@@ -61,47 +61,65 @@ public class Solution {
             grid[r] = lines[r].toCharArray();
         }
 
+        // Precompute neighbor counts for all rolls
+        int[][] neighborCount = new int[rows][cols];
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                if (grid[r][c] == '@') {
+                    int count = 0;
+                    for (int[] dir : DIRECTIONS) {
+                        int nr = r + dir[0];
+                        int nc = c + dir[1];
+                        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && grid[nr][nc] == '@') {
+                            count++;
+                        }
+                    }
+                    neighborCount[r][c] = count;
+                }
+            }
+        }
+
+        // Initialize queue with all accessible rolls (< 4 neighbors)
+        List<int[]> queue = new ArrayList<>();
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                if (grid[r][c] == '@' && neighborCount[r][c] < 4) {
+                    queue.add(new int[]{r, c});
+                }
+            }
+        }
+
         int totalRemoved = 0;
+        int queueIndex = 0;
 
-        while (true) {
-            // Find all rolls that can be removed in this iteration
-            List<int[]> removable = new ArrayList<>();
+        // Process queue
+        while (queueIndex < queue.size()) {
+            int[] pos = queue.get(queueIndex++);
+            int r = pos[0];
+            int c = pos[1];
 
-            for (int r = 0; r < rows; r++) {
-                for (int c = 0; c < cols; c++) {
-                    if (grid[r][c] == '@') {
-                        // Count adjacent rolls
-                        int adjacentRolls = 0;
-                        for (int[] dir : DIRECTIONS) {
-                            int nr = r + dir[0];
-                            int nc = c + dir[1];
-                            // Check bounds
-                            if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
-                                if (grid[nr][nc] == '@') {
-                                    adjacentRolls++;
-                                }
-                            }
-                        }
+            // Skip if already removed
+            if (grid[r][c] != '@') {
+                continue;
+            }
 
-                        // Can be removed if fewer than 4 adjacent rolls
-                        if (adjacentRolls < 4) {
-                            removable.add(new int[]{r, c});
-                        }
+            // Remove this roll
+            grid[r][c] = '.';
+            totalRemoved++;
+
+            // Decrement neighbor counts for all adjacent rolls
+            for (int[] dir : DIRECTIONS) {
+                int nr = r + dir[0];
+                int nc = c + dir[1];
+
+                if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && grid[nr][nc] == '@') {
+                    neighborCount[nr][nc]--;
+                    // If this neighbor just became accessible, add to queue
+                    if (neighborCount[nr][nc] == 3) {
+                        queue.add(new int[]{nr, nc});
                     }
                 }
             }
-
-            // If no rolls can be removed, we're done
-            if (removable.isEmpty()) {
-                break;
-            }
-
-            // Remove all accessible rolls
-            for (int[] pos : removable) {
-                grid[pos[0]][pos[1]] = '.';
-            }
-
-            totalRemoved += removable.size();
         }
 
         return totalRemoved;

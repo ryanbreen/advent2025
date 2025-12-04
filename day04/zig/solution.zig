@@ -132,56 +132,93 @@ fn part2(allocator: std.mem.Allocator, input: []const u8) !usize {
     var grid = try Grid.init(allocator, input);
     defer grid.deinit();
 
-    var total_removed: usize = 0;
+    const rows = grid.rows;
+    const cols = grid.cols;
 
-    const Position = struct { r: usize, c: usize };
-    var removable: std.ArrayList(Position) = .{};
-    defer removable.deinit(allocator);
+    // Precompute neighbor counts for all rolls
+    const neighbor_count_data = try allocator.alloc([]usize, rows);
+    defer {
+        for (neighbor_count_data) |row| {
+            allocator.free(row);
+        }
+        allocator.free(neighbor_count_data);
+    }
 
-    while (true) {
-        // Clear previous removable list
-        removable.clearRetainingCapacity();
+    for (0..rows) |i| {
+        neighbor_count_data[i] = try allocator.alloc(usize, cols);
+        @memset(neighbor_count_data[i], 0);
+    }
 
-        // Find all rolls that can be removed in this iteration
-        for (0..grid.rows) |r| {
-            for (0..grid.cols) |c| {
-                if (grid.get(r, c) == '@') {
-                    // Count adjacent rolls
-                    var adjacent_rolls: usize = 0;
-                    for (directions) |dir| {
-                        const nr = @as(i32, @intCast(r)) + dir.dr;
-                        const nc = @as(i32, @intCast(c)) + dir.dc;
+    for (0..rows) |r| {
+        for (0..cols) |c| {
+            if (grid.get(r, c) == '@') {
+                var count: usize = 0;
+                for (directions) |dir| {
+                    const nr = @as(i32, @intCast(r)) + dir.dr;
+                    const nc = @as(i32, @intCast(c)) + dir.dc;
 
-                        // Check bounds
-                        if (nr >= 0 and nr < @as(i32, @intCast(grid.rows)) and
-                            nc >= 0 and nc < @as(i32, @intCast(grid.cols))) {
-                            const ur = @as(usize, @intCast(nr));
-                            const uc = @as(usize, @intCast(nc));
-                            if (grid.get(ur, uc) == '@') {
-                                adjacent_rolls += 1;
-                            }
+                    if (nr >= 0 and nr < @as(i32, @intCast(rows)) and
+                        nc >= 0 and nc < @as(i32, @intCast(cols))) {
+                        const ur = @as(usize, @intCast(nr));
+                        const uc = @as(usize, @intCast(nc));
+                        if (grid.get(ur, uc) == '@') {
+                            count += 1;
                         }
                     }
+                }
+                neighbor_count_data[r][c] = count;
+            }
+        }
+    }
 
-                    // Can be removed if fewer than 4 adjacent rolls
-                    if (adjacent_rolls < 4) {
-                        try removable.append(allocator, .{ .r = r, .c = c });
+    // Initialize queue with all accessible rolls (< 4 neighbors)
+    const Position = struct { r: usize, c: usize };
+    var queue: std.ArrayList(Position) = .{};
+    defer queue.deinit(allocator);
+
+    for (0..rows) |r| {
+        for (0..cols) |c| {
+            if (grid.get(r, c) == '@' and neighbor_count_data[r][c] < 4) {
+                try queue.append(allocator, .{ .r = r, .c = c });
+            }
+        }
+    }
+
+    var total_removed: usize = 0;
+    var queue_index: usize = 0;
+
+    // Process queue
+    while (queue_index < queue.items.len) {
+        const pos = queue.items[queue_index];
+        queue_index += 1;
+
+        // Skip if already removed
+        if (grid.get(pos.r, pos.c) != '@') {
+            continue;
+        }
+
+        // Remove this roll
+        grid.set(pos.r, pos.c, '.');
+        total_removed += 1;
+
+        // Decrement neighbor counts for all adjacent rolls
+        for (directions) |dir| {
+            const nr = @as(i32, @intCast(pos.r)) + dir.dr;
+            const nc = @as(i32, @intCast(pos.c)) + dir.dc;
+
+            if (nr >= 0 and nr < @as(i32, @intCast(rows)) and
+                nc >= 0 and nc < @as(i32, @intCast(cols))) {
+                const ur = @as(usize, @intCast(nr));
+                const uc = @as(usize, @intCast(nc));
+                if (grid.get(ur, uc) == '@') {
+                    neighbor_count_data[ur][uc] -= 1;
+                    // If this neighbor just became accessible, add to queue
+                    if (neighbor_count_data[ur][uc] == 3) {
+                        try queue.append(allocator, .{ .r = ur, .c = uc });
                     }
                 }
             }
         }
-
-        // If no rolls can be removed, we're done
-        if (removable.items.len == 0) {
-            break;
-        }
-
-        // Remove all accessible rolls
-        for (removable.items) |pos| {
-            grid.set(pos.r, pos.c, '.');
-        }
-
-        total_removed += removable.items.len;
     }
 
     return total_removed;

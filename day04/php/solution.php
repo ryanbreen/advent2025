@@ -14,58 +14,58 @@ const DIRECTIONS = [
     [1, -1],  [1, 0],  [1, 1]
 ];
 
-/**
- * Count the number of adjacent rolls ('@') around position ($r, $c).
- */
-function count_adjacent_rolls($grid, $r, $c) {
-    $rows = is_array($grid) && count($grid) > 0 ? (is_array($grid[0]) ? count($grid) : count($grid)) : 0;
-    $cols = is_array($grid) && count($grid) > 0 ? (is_array($grid[0]) ? count($grid[0]) : strlen($grid[0])) : 0;
-    $count = 0;
+// ============== PRECOMPUTE ROLL POSITIONS AND NEIGHBORS ==============
+$grid = $lines;
+$rows = count($grid);
+$cols = $rows > 0 ? strlen($grid[0]) : 0;
 
-    foreach (DIRECTIONS as [$dr, $dc]) {
-        $nr = $r + $dr;
-        $nc = $c + $dc;
-        // Check bounds
-        if ($nr >= 0 && $nr < $rows && $nc >= 0 && $nc < $cols) {
-            $cell = is_array($grid[$nr]) ? $grid[$nr][$nc] : $grid[$nr][$nc];
-            if ($cell === '@') {
-                $count++;
+$roll_positions = [];   // Array of [r, c] for each roll
+$pos_to_index = [];     // Array: "r,c" => index in roll_positions
+$roll_neighbors = [];   // Array of arrays: neighbors for each roll
+
+for ($r = 0; $r < $rows; $r++) {
+    for ($c = 0; $c < $cols; $c++) {
+        if ($grid[$r][$c] === '@') {
+            $idx = count($roll_positions);
+            $roll_positions[] = [$r, $c];
+            $pos_to_index["$r,$c"] = $idx;
+
+            // Precompute neighbors for this roll
+            $neighbors = [];
+            foreach (DIRECTIONS as [$dr, $dc]) {
+                $nr = $r + $dr;
+                $nc = $c + $dc;
+                if ($nr >= 0 && $nr < $rows && $nc >= 0 && $nc < $cols && $grid[$nr][$nc] === '@') {
+                    $neighbors[] = "$nr,$nc";
+                }
             }
+            $roll_neighbors[] = $neighbors;
         }
     }
-
-    return $count;
 }
 
-function part1($lines) {
+$num_rolls = count($roll_positions);
+
+function part1($roll_neighbors, $num_rolls) {
     /**
      * Count rolls of paper that can be accessed by a forklift.
      *
      * A roll can be accessed if it has fewer than 4 adjacent rolls
      * in the 8 surrounding positions (including diagonals).
      */
-    $grid = $lines;
-    $rows = count($grid);
-    $cols = $rows > 0 ? strlen($grid[0]) : 0;
-
     $accessible_count = 0;
 
-    for ($r = 0; $r < $rows; $r++) {
-        for ($c = 0; $c < $cols; $c++) {
-            if ($grid[$r][$c] === '@') {
-                $adjacent_rolls = count_adjacent_rolls($grid, $r, $c);
-                // Accessible if fewer than 4 adjacent rolls
-                if ($adjacent_rolls < 4) {
-                    $accessible_count++;
-                }
-            }
+    for ($i = 0; $i < $num_rolls; $i++) {
+        $neighbor_count = count($roll_neighbors[$i]);
+        if ($neighbor_count < 4) {
+            $accessible_count++;
         }
     }
 
     return $accessible_count;
 }
 
-function part2($lines) {
+function part2($roll_positions, $roll_neighbors, $pos_to_index, $num_rolls) {
     /**
      * Count total rolls removed by iteratively removing accessible rolls.
      *
@@ -73,49 +73,75 @@ function part2($lines) {
      * After removal, check again for newly accessible rolls.
      * Repeat until no more rolls can be removed.
      */
-    // Create a mutable copy of the grid
-    $grid = [];
-    foreach ($lines as $line) {
-        $grid[] = str_split($line);
+    // Track which rolls are still active
+    $active = [];
+    for ($i = 0; $i < $num_rolls; $i++) {
+        [$r, $c] = $roll_positions[$i];
+        $active["$r,$c"] = true;
     }
 
-    $rows = count($grid);
-    $cols = $rows > 0 ? count($grid[0]) : 0;
+    // Compute initial neighbor counts
+    $neighbor_count = [];
+    for ($i = 0; $i < $num_rolls; $i++) {
+        $count = 0;
+        foreach ($roll_neighbors[$i] as $neighbor_pos) {
+            if (isset($active[$neighbor_pos])) {
+                $count++;
+            }
+        }
+        $neighbor_count[$i] = $count;
+    }
 
+    // Initialize queue with accessible rolls (neighbor count < 4)
+    $queue = [];
+    $in_queue = [];
+    for ($i = 0; $i < $num_rolls; $i++) {
+        if ($neighbor_count[$i] < 4) {
+            $queue[] = $i;
+            $in_queue[$i] = true;
+        }
+    }
+
+    // Process queue
     $total_removed = 0;
 
-    while (true) {
-        // Find all rolls that can be removed in this iteration
-        $removable = [];
+    while (!empty($queue)) {
+        $next_queue = [];
 
-        for ($r = 0; $r < $rows; $r++) {
-            for ($c = 0; $c < $cols; $c++) {
-                if ($grid[$r][$c] === '@') {
-                    $adjacent_rolls = count_adjacent_rolls($grid, $r, $c);
-                    // Can be removed if fewer than 4 adjacent rolls
-                    if ($adjacent_rolls < 4) {
-                        $removable[] = [$r, $c];
+        foreach ($queue as $idx) {
+            [$r, $c] = $roll_positions[$idx];
+            $pos_key = "$r,$c";
+
+            // Skip if already removed
+            if (!isset($active[$pos_key])) {
+                continue;
+            }
+
+            // Remove this roll
+            unset($active[$pos_key]);
+            $total_removed++;
+
+            // Update neighbors' counts
+            foreach ($roll_neighbors[$idx] as $neighbor_pos) {
+                if (isset($active[$neighbor_pos])) {
+                    $neighbor_idx = $pos_to_index[$neighbor_pos];
+                    $neighbor_count[$neighbor_idx]--;
+
+                    // Add to queue if now accessible and not already queued
+                    if ($neighbor_count[$neighbor_idx] < 4 && !isset($in_queue[$neighbor_idx])) {
+                        $next_queue[] = $neighbor_idx;
+                        $in_queue[$neighbor_idx] = true;
                     }
                 }
             }
         }
 
-        // If no rolls can be removed, we're done
-        if (empty($removable)) {
-            break;
-        }
-
-        // Remove all accessible rolls
-        foreach ($removable as [$r, $c]) {
-            $grid[$r][$c] = '.';
-        }
-
-        $total_removed += count($removable);
+        $queue = $next_queue;
     }
 
     return $total_removed;
 }
 
 // Run both parts
-echo "Part 1: " . part1($lines) . "\n";
-echo "Part 2: " . part2($lines) . "\n";
+echo "Part 1: " . part1($roll_neighbors, $num_rolls) . "\n";
+echo "Part 2: " . part2($roll_positions, $roll_neighbors, $pos_to_index, $num_rolls) . "\n";
