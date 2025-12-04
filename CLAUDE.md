@@ -109,6 +109,12 @@ Reference 2025/day01/python/solution.py for the algorithm.
 Run your solution and report the output.
 ```
 
+## Answer Submission with Multi-Agent Approach
+
+When running multiple agents in parallel to implement solutions across languages, **submit the answer once three independent implementations agree on the same output**. This provides high confidence in correctness through independent verification.
+
+Once three agents report matching answers, it's safe to submit without waiting for all implementations to complete. Continue running remaining agents in the background to fill out the full language set.
+
 ## IMPORTANT: Benchmarking Requirements
 
 Every solution must be benchmarked after implementation. When an agent completes a solution, they are responsible for:
