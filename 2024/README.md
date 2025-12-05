@@ -9,6 +9,7 @@ Solutions implemented in 16 languages.
 | 1   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 2   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 3   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
+| 4   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion + Kotlin, Scala, AWK |
 
 ## Benchmarks
 
@@ -76,3 +77,27 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Java        | 335.6        | 127.0       |
 | Clojure     | 424.7        | 127.7       |
 | ColdFusion  | 2,726.8      | 1,135.2     |
+
+### Day 4: Ceres Search
+
+| Language    | Runtime (ms) | Memory (MB) |
+|-------------|--------------|-------------|
+| Zig         | 6.1          | 1.9         |
+| C++         | 6.5          | 1.9         |
+| ARM64 asm   | 6.8          | 1.9         |
+| C           | 6.9          | 1.9         |
+| Rust        | 7.4          | 1.9         |
+| Node.js     | 57.7         | 48.5        |
+| Python      | 60.7         | 15.6        |
+| Java        | 68.8         | 47.4        |
+| Go          | 71.9         | 26.7        |
+| PHP         | 73.5         | 24.5        |
+| Perl        | 75.1         | 5.7         |
+| Kotlin      | 84.3         | 55.8        |
+| Lisp        | 99.6         | 40.1        |
+| Ruby        | 157.9        | 28.3        |
+| AWK         | 227.6        | 3.7         |
+| Clojure     | 494.7        | 213.9       |
+| Scala       | 1,765.9      | 266.1       |
+| ColdFusion  | 2,772.2      | 1,119.8     |
+| Bash        | 23,480.7     | 2.1         |

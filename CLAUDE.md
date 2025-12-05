@@ -3,6 +3,29 @@
 ## Overview
 This project solves Advent of Code challenges across multiple years in 16 languages, with automated problem extraction via Playwright.
 
+## Standard Language Set (Required)
+
+Every day's solution **MUST** be implemented in these 16 languages:
+
+1. **ARM64 Assembly** - Low-level, macOS ARM64
+2. **C** - Systems programming
+3. **C++** - Systems programming with abstractions
+4. **Rust** - Memory-safe systems programming
+5. **Zig** - Modern systems programming
+6. **Go** - Compiled, garbage-collected
+7. **Java** - JVM, object-oriented
+8. **Node.js** - JavaScript runtime
+9. **Python** - Scripting, rapid prototyping
+10. **Ruby** - Scripting, expressive syntax
+11. **PHP** - Scripting
+12. **Perl** - Text processing, scripting
+13. **Bash** - Shell scripting
+14. **Clojure** - JVM, functional Lisp
+15. **Common Lisp** - Classic Lisp
+16. **ColdFusion** - CFML scripting
+
+**Additional languages** (Kotlin, Scala, AWK, etc.) may be added for variety, but the 16 above are the minimum required set for every day.
+
 ## Project Structure
 ```
 advent/

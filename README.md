@@ -7,13 +7,17 @@ Solutions to [Advent of Code](https://adventofcode.com/) challenges across multi
 | Year | Days | Status |
 |------|------|--------|
 | [2025](2025/) | 5 | In progress |
-| [2024](2024/) | 2 | In progress |
+| [2024](2024/) | 4 | In progress |
 
 ## Approach
 
 This project takes a unique approach to Advent of Code:
 
-1. **Multi-language solutions**: Each day's puzzle is solved in 16 languages (ARM64 Assembly, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, and ColdFusion) to validate correctness through independent implementations.
+1. **Multi-language solutions**: Each day's puzzle is solved in a minimum of 16 standard languages to validate correctness through independent implementations. Additional languages may be added for variety.
+
+   **Standard 16 (required):** ARM64 Assembly, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion
+
+   **Bonus languages (optional):** Kotlin, Scala, AWK, and others may appear on some days
 
 2. **Parallel agent solving**: Solutions are developed by independent AI agents working in parallel, each implementing the solution in their assigned language without seeing other implementations. When agents converge on the same answer, we have high confidence in correctness.
 

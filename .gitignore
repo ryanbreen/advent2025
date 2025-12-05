@@ -20,6 +20,13 @@ venv/
 **/solution.o
 **/test
 **/*.class
+**/*.jar
+
+# Scala
+**/.scala-build/
+**/.bsp/
+**/project/
+**/target/
 
 # Rust
 **/target/
