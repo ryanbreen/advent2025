@@ -6,8 +6,9 @@ Solutions to [Advent of Code](https://adventofcode.com/) challenges across multi
 
 | Year | Days | Status |
 |------|------|--------|
-| [2025](2025/) | 5 | In progress |
-| [2024](2024/) | 4 | In progress |
+| [2025](2025/) | 6 | In progress |
+| [2024](2024/) | 5 | In progress |
+| [2023](2023/) | 1 | In progress |
 
 ## Approach
 
@@ -39,6 +40,9 @@ advent/
 │   ├── extract.js         # Problem & input extraction
 │   ├── submit.js          # Answer submission
 │   └── benchmark.py       # Performance benchmarking
+├── 2023/
+│   ├── README.md          # 2023 progress & benchmarks
+│   └── dayXX/             # Solutions by day
 ├── 2024/
 │   ├── README.md          # 2024 progress & benchmarks
 │   └── dayXX/             # Solutions by day
