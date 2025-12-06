@@ -28,6 +28,9 @@ venv/
 **/project/
 **/target/
 
+# Clojure
+**/.cpcache/
+
 # Rust
 **/target/
 
