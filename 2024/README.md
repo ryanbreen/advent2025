@@ -11,6 +11,7 @@ Solutions implemented in 16 languages.
 | 3   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 4   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion + Kotlin, Scala, AWK |
 | 5   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
+| 6   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 
 ## Benchmarks
 
@@ -123,3 +124,24 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Clojure     | 421.8        | 145.8       |
 | ColdFusion  | 2,602.9      | 1,122.0     |
 | Bash        | 78,992.4     | 3.8         |
+
+### Day 6: Guard Gallivant
+
+| Language    | Runtime (ms) | Memory (MB) |
+|-------------|--------------|-------------|
+| ARM64 asm   | 4.68         | 1.88        |
+| C           | 19.61        | 7.98        |
+| Python      | 31.14        | 16.67       |
+| Perl        | 32.41        | 41.19       |
+| Common Lisp | 44.16        | 18.53       |
+| Node.js     | 49.55        | 46.86       |
+| PHP         | 61.44        | 26.56       |
+| C++         | 69.34        | 45.45       |
+| Ruby        | 70.04        | 30.09       |
+| Go          | 71.19        | 27.31       |
+| Rust        | 255.18       | 109.81      |
+| Java        | 358.15       | 114.05      |
+| Clojure     | 437.48       | 140.64      |
+| Zig         | 3,279.09     | 231.64      |
+| Bash        | 3,635.02     | 4.52        |
+| ColdFusion  | 4.68         | 1.88        |

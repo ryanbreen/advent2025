@@ -17,10 +17,12 @@ venv/
 
 # Compiled binaries (convention: output named 'solution')
 **/solution
-**/solution.o
 **/test
 **/*.class
 **/*.jar
+
+# Object files
+**/*.o
 
 # Scala
 **/.scala-build/

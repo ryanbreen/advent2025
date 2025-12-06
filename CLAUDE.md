@@ -208,6 +208,15 @@ node runner/submit.js 2024 3 2 71668682
 
 Note: AoC has rate limiting (~5 seconds between submissions). If you get a rate limit error, wait and retry.
 
+**IMPORTANT: Re-submitting already-solved answers returns "INCORRECT"**
+
+When you submit an answer for a puzzle that has ALREADY been solved correctly, AoC does NOT say "you already solved this" - it returns "INCORRECT" or "That's not the right answer". This is confusing but expected behavior.
+
+Before assuming an answer is wrong:
+1. Check the AoC page directly (use Playwright with `headless: false` to visually inspect)
+2. Look for "Your puzzle answer was <code>X</code>" on the puzzle page
+3. If the answer is shown on the page, the puzzle is already solved - don't keep re-submitting
+
 ## Commands
 ```bash
 # Start login session (opens browser for manual GitHub auth)
