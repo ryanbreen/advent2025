@@ -390,13 +390,7 @@ main() {
     fi
 
     if [[ -z "$STEP" || "$STEP" == "2" ]]; then
-        if [[ -n "$STEP" ]]; then
-            # If explicitly requesting step 2, no pause
-            :
-        else
-            echo -e "${YELLOW}Press Enter to continue to review phase...${NC}"
-            read -r
-        fi
+        # No pause between phases - run continuously
         run_review_phase "$state_dir"
     fi
 
