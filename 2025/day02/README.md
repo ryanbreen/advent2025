@@ -185,23 +185,24 @@ for (int i = pattern_len; i < len; i++) {
 
 ## Benchmark Results
 
-| Language | Runtime (ms) | Memory (MB) |
-|----------|-------------|-------------|
-| C | TBD | TBD |
-| C++ | TBD | TBD |
-| Go | TBD | TBD |
-| Zig | TBD | TBD |
-| Python | TBD | TBD |
-| Node.js | TBD | TBD |
-| Ruby | TBD | TBD |
-| PHP | TBD | TBD |
-| Perl | TBD | TBD |
-| Java | TBD | TBD |
-| Clojure | TBD | TBD |
-| Common Lisp | TBD | TBD |
-| ColdFusion | TBD | TBD |
-| Bash | TBD | TBD |
-| ARM64 Assembly | TBD | TBD |
+| Language    | Runtime (ms) | Memory (MB) |
+|-------------|--------------|-------------|
+| Zig         | 37           | 1.9         |
+| ARM64 asm   | 65           | 1.9         |
+| Rust        | 136          | 1.9         |
+| C++         | 198          | 1.9         |
+| C           | 211          | 1.9         |
+| Go          | 217          | 10.0        |
+| Java        | 289          | 596.0       |
+| Node.js     | 315          | 87.6        |
+| Common Lisp | 587          | 89.4        |
+| PHP         | 610          | 24.4        |
+| Python      | 1,192        | 15.6        |
+| Clojure     | 1,210        | 1,298       |
+| Ruby        | 2,092        | 28.2        |
+| Perl        | 2,461        | 4.3         |
+| ColdFusion  | 6,909        | 1,141.8     |
+| Bash        | 90,930       | 1.5         |
 
 ## Answers
 

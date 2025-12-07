@@ -213,23 +213,21 @@ The problem demonstrates a common AoC pattern: **positional parsing** where mean
 
 ## Benchmark Results
 
-| Language | Runtime (ms) | Memory (MB) |
-|----------|-------------|-------------|
-| ARM64 Assembly | - | - |
-| C | - | - |
-| C++ | - | - |
-| Rust | - | - |
-| Zig | - | - |
-| Go | - | - |
-| Java | - | - |
-| Node.js | - | - |
-| Python | - | - |
-| Ruby | - | - |
-| PHP | - | - |
-| Perl | - | - |
-| Bash | - | - |
-| Clojure | - | - |
-| Common Lisp | - | - |
-| ColdFusion | - | - |
-
-*Note: Benchmarks to be filled in after running `python3 runner/benchmark.py` on each implementation.*
+| Language    | Runtime (ms) | Memory (MB) |
+|-------------|--------------|-------------|
+| C++         | 6.1          | 1.9         |
+| Zig         | 6.3          | 1.9         |
+| ARM64 asm   | 6.9          | 1.9         |
+| C           | 7.0          | 18.0        |
+| Go          | 9.5          | 4.4         |
+| Rust        | 24.7         | 1.9         |
+| Python      | 33.9         | 16.3        |
+| Common Lisp | 41.3         | 52.5        |
+| Node.js     | 49.3         | 44.7        |
+| PHP         | 61.3         | 24.9        |
+| Java        | 62.9         | 50.3        |
+| Perl        | 69.7         | 14.3        |
+| Ruby        | 69.6         | 28.8        |
+| Clojure     | 498.7        | 194.4       |
+| ColdFusion  | 2,706.7      | 1,111.1     |
+| Bash        | 29,648.6     | 3.6         |
