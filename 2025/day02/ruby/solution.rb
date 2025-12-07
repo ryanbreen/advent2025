@@ -1,96 +1,95 @@
 #!/usr/bin/env ruby
 
+require 'set'
+
 # Read input file
 input_text = File.read(File.join(__dir__, '..', 'input.txt')).strip
 
-def is_invalid_id_part1(num)
-  """Check if a number is invalid (a pattern repeated exactly twice)."""
-  s = num.to_s
-  length = s.length
-
-  # Must have even length to be repeated twice
-  return false if length % 2 != 0
-
-  # Check if it starts with 0 (leading zeros not allowed)
-  return false if s[0] == '0'
-
-  # Split in half and check if both halves are identical
-  mid = length / 2
-  first_half = s[0...mid]
-  second_half = s[mid..-1]
-
-  first_half == second_half
+def parse_ranges(input_text)
+  input_text.split(',').map do |part|
+    parts = part.strip.split('-')
+    [parts[0].to_i, parts[1].to_i] if parts.length == 2
+  end.compact
 end
 
-def is_invalid_id_part2(num)
-  """Check if a number is invalid (a pattern repeated at least twice)."""
-  s = num.to_s
-  length = s.length
+# Part 1: Generate invalid IDs (pattern repeated exactly twice)
+# Instead of iterating through all numbers in the range, we enumerate patterns
+# and check if their repeated form falls within the range
+def generate_invalid_ids_part1(start_val, end_val)
+  invalid_ids = []
 
-  # Check if it starts with 0 (leading zeros not allowed)
-  return false if s[0] == '0'
+  start_digits = start_val.to_s.size
+  end_digits = end_val.to_s.size
 
-  # Try all possible pattern lengths from 1 to length//2
-  # The pattern must be repeated at least twice, so max pattern length is length//2
-  (1..length / 2).each do |pattern_length|
-    # Check if the string length is divisible by pattern_length
-    if length % pattern_length == 0
-      pattern = s[0...pattern_length]
-      # Check if repeating the pattern gives us the original string
-      return true if pattern * (length / pattern_length) == s
+  (start_digits..end_digits).each do |total_digits|
+    next unless total_digits.even?
+
+    pattern_digits = total_digits >> 1
+    pattern_min = 10 ** (pattern_digits - 1)
+    pattern_max = 10 ** pattern_digits - 1
+
+    (pattern_min..pattern_max).each do |pattern|
+      # Create the number by repeating the pattern twice
+      repeated = (pattern.to_s * 2).to_i
+
+      # Check if it falls within our range
+      invalid_ids << repeated if repeated >= start_val && repeated <= end_val
     end
   end
 
-  false
+  invalid_ids
 end
 
-def part1(input_text)
-  # Parse ranges from input
-  ranges = []
-  input_text.split(',').each do |part|
-    part = part.strip
-    if part.include?('-')
-      parts = part.split('-')
-      if parts.length == 2
-        start_val = parts[0].to_i
-        end_val = parts[1].to_i
-        ranges << [start_val, end_val]
+# Part 2: Generate invalid IDs (pattern repeated at least twice)
+# Enumerate all patterns and repetition counts
+def generate_invalid_ids_part2(start_val, end_val)
+  invalid_ids = Set.new
+
+  start_digits = start_val.to_s.size
+  end_digits = end_val.to_s.size
+
+  (start_digits..end_digits).each do |total_digits|
+    # Try all divisors of total_digits as pattern lengths
+    1.upto(total_digits >> 1) do |pattern_digits|
+      next unless (total_digits % pattern_digits).zero?
+
+      repetitions = total_digits / pattern_digits
+      next if repetitions < 2
+
+      # Generate all patterns of this length
+      pattern_min = pattern_digits == 1 ? 1 : 10 ** (pattern_digits - 1)
+      pattern_max = 10 ** pattern_digits - 1
+
+      (pattern_min..pattern_max).each do |pattern|
+        # Create the repeated number
+        repeated = (pattern.to_s * repetitions).to_i
+
+        # Check if it falls within our range and has correct number of digits
+        if repeated >= start_val && repeated <= end_val && repeated.to_s.size == total_digits
+          invalid_ids << repeated
+        end
       end
     end
   end
 
+  invalid_ids
+end
+
+def part1(input_text)
+  ranges = parse_ranges(input_text)
   total = 0
   ranges.each do |start_val, end_val|
-    (start_val..end_val).each do |num|
-      total += num if is_invalid_id_part1(num)
-    end
+    total += generate_invalid_ids_part1(start_val, end_val).sum
   end
-
   total
 end
 
 def part2(input_text)
-  # Parse ranges from input
-  ranges = []
-  input_text.split(',').each do |part|
-    part = part.strip
-    if part.include?('-')
-      parts = part.split('-')
-      if parts.length == 2
-        start_val = parts[0].to_i
-        end_val = parts[1].to_i
-        ranges << [start_val, end_val]
-      end
-    end
-  end
-
+  ranges = parse_ranges(input_text)
   total = 0
   ranges.each do |start_val, end_val|
-    (start_val..end_val).each do |num|
-      total += num if is_invalid_id_part2(num)
-    end
+    total += generate_invalid_ids_part2(start_val, end_val).sum
   end
-
   total
 end
 

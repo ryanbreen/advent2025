@@ -120,7 +120,7 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Rust        | 68.7         | 1.9         |
 | Java        | 95.5         | 48.1        |
 | PHP         | 147.5        | 24.7        |
-| Go          | 315.0        | 27.3        |
+| Go          | 9.2          | 4.1         |
 | Clojure     | 839.3        | 133.8       |
 | ColdFusion  | 3,500.0      | 1,100.0     |
 

@@ -27,43 +27,46 @@ func part1(lines []string) int {
 		return 0
 	}
 
-	// Track active beam columns at each row
-	// Use a map to handle beam merging
-	activeBeams := make(map[int]bool)
+	// Track active beam columns using slices instead of maps
+	activeBeams := make([]bool, cols)
+	newBeams := make([]bool, cols)
 	activeBeams[startCol] = true
 	splitCount := 0
 
 	// Process row by row starting from row 1 (below S)
 	for row := 1; row < rows; row++ {
-		newBeams := make(map[int]bool)
+		// Clear newBeams
+		for i := range newBeams {
+			newBeams[i] = false
+		}
 
-		for col := range activeBeams {
-			if col >= 0 && col < cols {
+		hasBeams := false
+		for col := 0; col < cols; col++ {
+			if activeBeams[col] {
 				cell := lines[row][col]
 				if cell == '^' {
 					// Beam hits splitter - count it and emit left/right
 					splitCount++
-					// Left beam goes to col-1, right beam goes to col+1
 					if col-1 >= 0 {
 						newBeams[col-1] = true
+						hasBeams = true
 					}
 					if col+1 < cols {
 						newBeams[col+1] = true
+						hasBeams = true
 					}
-				} else if cell == '.' {
-					// Beam continues straight down
-					newBeams[col] = true
 				} else {
-					// If cell is something else (like S), beam continues
+					// Beam continues straight down (for '.', 'S', or any other char)
 					newBeams[col] = true
+					hasBeams = true
 				}
 			}
 		}
 
-		activeBeams = newBeams
+		// Swap slices
+		activeBeams, newBeams = newBeams, activeBeams
 
-		// If no more beams, stop
-		if len(activeBeams) == 0 {
+		if !hasBeams {
 			break
 		}
 	}
@@ -91,17 +94,21 @@ func part2(lines []string) uint64 {
 		return 0
 	}
 
-	// Track number of timelines at each column position
-	// Use a map: col -> count of timelines at that position
-	timelines := make(map[int]uint64)
+	// Track number of timelines at each column using slices instead of maps
+	timelines := make([]uint64, cols)
+	newTimelines := make([]uint64, cols)
 	timelines[startCol] = 1
 
 	// Process row by row starting from row 1 (below S)
 	for row := 1; row < rows; row++ {
-		newTimelines := make(map[int]uint64)
+		// Clear newTimelines
+		for i := range newTimelines {
+			newTimelines[i] = 0
+		}
 
-		for col, count := range timelines {
-			if col >= 0 && col < cols {
+		for col := 0; col < cols; col++ {
+			count := timelines[col]
+			if count > 0 {
 				cell := lines[row][col]
 				if cell == '^' {
 					// Each timeline splits into 2 (left and right)
@@ -111,22 +118,15 @@ func part2(lines []string) uint64 {
 					if col+1 < cols {
 						newTimelines[col+1] += count
 					}
-				} else if cell == '.' {
-					// Timelines continue straight down
-					newTimelines[col] += count
 				} else {
-					// Other characters - timelines continue
+					// Timelines continue straight down (for '.', 'S', or any other char)
 					newTimelines[col] += count
 				}
 			}
 		}
 
-		timelines = newTimelines
-
-		// If no more timelines, stop
-		if len(timelines) == 0 {
-			break
-		}
+		// Swap slices
+		timelines, newTimelines = newTimelines, timelines
 	}
 
 	// Total number of timelines

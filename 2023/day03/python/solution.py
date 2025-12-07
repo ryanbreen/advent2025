@@ -53,8 +53,24 @@ def part2():
     rows = len(lines)
     cols = len(lines[0]) if rows > 0 else 0
 
-    # Find all numbers and their positions
-    numbers = []  # List of (number, row, start_col, end_col)
+    # Map of gear position -> list of adjacent numbers
+    gear_candidates = {}
+
+    # Helper to get adjacent positions around a number
+    def get_adjacent_positions(row, start_col, end_col):
+        positions = []
+        # Row above
+        for c in range(start_col - 1, end_col + 2):
+            positions.append((row - 1, c))
+        # Same row (left and right)
+        positions.append((row, start_col - 1))
+        positions.append((row, end_col + 1))
+        # Row below
+        for c in range(start_col - 1, end_col + 2):
+            positions.append((row + 1, c))
+        return positions
+
+    # Find all numbers and track which * positions they're adjacent to
     for row in range(rows):
         col = 0
         while col < cols:
@@ -65,33 +81,23 @@ def part2():
                     num_str += lines[row][col]
                     col += 1
                 end_col = col - 1
-                numbers.append((int(num_str), row, start_col, end_col))
+                number = int(num_str)
+
+                # Find adjacent * symbols and add this number to their list
+                for r, c in get_adjacent_positions(row, start_col, end_col):
+                    if 0 <= r < rows and 0 <= c < cols and lines[r][c] == '*':
+                        key = (r, c)
+                        if key not in gear_candidates:
+                            gear_candidates[key] = []
+                        gear_candidates[key].append(number)
             else:
                 col += 1
 
-    # Helper function to check if a number is adjacent to a position
-    def is_adjacent(num_row, num_start, num_end, gear_row, gear_col):
-        for r in range(num_row - 1, num_row + 2):
-            for c in range(num_start - 1, num_end + 2):
-                if r == gear_row and c == gear_col:
-                    return True
-        return False
-
-    # Find all gears (*)
+    # Find gears (exactly 2 adjacent numbers) and calculate gear ratios
     total = 0
-    for row in range(rows):
-        for col in range(cols):
-            if lines[row][col] == '*':
-                # Find all numbers adjacent to this *
-                adjacent_numbers = []
-                for num, num_row, num_start, num_end in numbers:
-                    if is_adjacent(num_row, num_start, num_end, row, col):
-                        adjacent_numbers.append(num)
-
-                # If exactly 2 numbers are adjacent, it's a gear
-                if len(adjacent_numbers) == 2:
-                    gear_ratio = adjacent_numbers[0] * adjacent_numbers[1]
-                    total += gear_ratio
+    for numbers in gear_candidates.values():
+        if len(numbers) == 2:
+            total += numbers[0] * numbers[1]
 
     return total
 

@@ -1,222 +1,156 @@
 const std = @import("std");
 
-const Direction = enum {
-    North,
-    East,
-    South,
-    West,
+const MAX_SIZE = 200;
 
-    fn turnRight(self: Direction) Direction {
-        return switch (self) {
-            .North => .East,
-            .East => .South,
-            .South => .West,
-            .West => .North,
-        };
+// Direction vectors: up, right, down, left (matching C implementation)
+const dx = [4]i32{ -1, 0, 1, 0 };
+const dy = [4]i32{ 0, 1, 0, -1 };
+
+// Simulate guard movement
+// Returns true if guard gets stuck in a loop, false if they leave the map
+// If count_visited is true, also counts distinct positions visited
+fn simulate(grid: *const [MAX_SIZE][MAX_SIZE]u8, rows: usize, cols: usize, start_x: usize, start_y: usize, start_dir: usize, obstruction_x: ?usize, obstruction_y: ?usize, count_visited: bool, visited_count: *usize) bool {
+    var visited: [MAX_SIZE][MAX_SIZE]bool = undefined;
+    var state_visited: [MAX_SIZE][MAX_SIZE][4]bool = undefined;
+
+    // Zero-initialize arrays
+    @memset(&visited, [_]bool{false} ** MAX_SIZE);
+    for (&state_visited) |*row| {
+        @memset(row, [_]bool{false} ** 4);
     }
 
-    fn getDelta(self: Direction) struct { dx: i32, dy: i32 } {
-        return switch (self) {
-            .North => .{ .dx = 0, .dy = -1 },
-            .East => .{ .dx = 1, .dy = 0 },
-            .South => .{ .dx = 0, .dy = 1 },
-            .West => .{ .dx = -1, .dy = 0 },
-        };
-    }
-};
-
-const Position = struct {
-    x: i32,
-    y: i32,
-};
-
-const State = struct {
-    x: i32,
-    y: i32,
-    dir: Direction,
-};
-
-fn simulatePatrol(allocator: std.mem.Allocator, grid: [][]u8, start_pos: Position, start_dir: Direction) !std.AutoHashMap(Position, void) {
-    const height: i32 = @intCast(grid.len);
-    const width: i32 = @intCast(grid[0].len);
-
-    var visited = std.AutoHashMap(Position, void).init(allocator);
-    try visited.put(start_pos, {});
-
-    var pos = start_pos;
+    var x = start_x;
+    var y = start_y;
     var dir = start_dir;
 
-    while (true) {
-        const delta = dir.getDelta();
-        const next_x = pos.x + delta.dx;
-        const next_y = pos.y + delta.dy;
-
-        // Check if the guard has left the map
-        if (next_x < 0 or next_x >= width or next_y < 0 or next_y >= height) {
-            break;
-        }
-
-        // Check if there's an obstacle ahead
-        const next_cell = grid[@intCast(next_y)][@intCast(next_x)];
-        if (next_cell == '#') {
-            // Turn right
-            dir = dir.turnRight();
-        } else {
-            // Move forward
-            pos.x = next_x;
-            pos.y = next_y;
-            try visited.put(pos, {});
-        }
-    }
-
-    return visited;
-}
-
-fn detectLoop(allocator: std.mem.Allocator, grid: [][]u8, start_pos: Position, start_dir: Direction) !bool {
-    const height: i32 = @intCast(grid.len);
-    const width: i32 = @intCast(grid[0].len);
-
-    var states = std.AutoHashMap(State, void).init(allocator);
-    defer states.deinit();
-
-    var pos = start_pos;
-    var dir = start_dir;
+    visited[x][y] = true;
+    var count: usize = 1;
 
     while (true) {
-        const state = State{ .x = pos.x, .y = pos.y, .dir = dir };
-        if (states.contains(state)) {
+        // Check if we've seen this state before (loop detection)
+        if (state_visited[x][y][dir]) {
             return true; // Loop detected
         }
-        try states.put(state, {});
+        state_visited[x][y][dir] = true;
 
-        const delta = dir.getDelta();
-        const next_x = pos.x + delta.dx;
-        const next_y = pos.y + delta.dy;
+        // Try to move forward
+        const next_x_i: i32 = @as(i32, @intCast(x)) + dx[dir];
+        const next_y_i: i32 = @as(i32, @intCast(y)) + dy[dir];
 
-        // Check if the guard has left the map
-        if (next_x < 0 or next_x >= width or next_y < 0 or next_y >= height) {
-            return false; // Exited the map
+        // Check if we're leaving the map
+        if (next_x_i < 0 or next_x_i >= @as(i32, @intCast(rows)) or next_y_i < 0 or next_y_i >= @as(i32, @intCast(cols))) {
+            // Guard leaves the map
+            if (count_visited) {
+                visited_count.* = count;
+            }
+            return false;
         }
 
-        // Check if there's an obstacle ahead
-        const next_cell = grid[@intCast(next_y)][@intCast(next_x)];
-        if (next_cell == '#') {
+        const next_x: usize = @intCast(next_x_i);
+        const next_y: usize = @intCast(next_y_i);
+
+        // Check if there's an obstacle
+        const is_obstacle = (grid[next_x][next_y] == '#') or
+            (obstruction_x != null and obstruction_y != null and next_x == obstruction_x.? and next_y == obstruction_y.?);
+
+        if (is_obstacle) {
             // Turn right
-            dir = dir.turnRight();
+            dir = (dir + 1) % 4;
         } else {
             // Move forward
-            pos.x = next_x;
-            pos.y = next_y;
+            x = next_x;
+            y = next_y;
+
+            if (count_visited and !visited[x][y]) {
+                visited[x][y] = true;
+                count += 1;
+            }
         }
     }
 }
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
-
     // Read the input file
     const file = try std.fs.cwd().openFile("../input.txt", .{});
     defer file.close();
 
-    const content = try file.readToEndAlloc(allocator, 1024 * 1024);
-    defer allocator.free(content);
+    var buf: [1024 * 1024]u8 = undefined;
+    const bytes_read = try file.readAll(&buf);
+    const content = buf[0..bytes_read];
 
-    // Parse the map - count lines first
-    var line_count: usize = 0;
-    var lines_iter = std.mem.splitSequence(u8, content, "\n");
-    while (lines_iter.next()) |line| {
-        if (line.len > 0) {
-            line_count += 1;
-        }
-    }
+    // Parse the grid into fixed-size array
+    var grid: [MAX_SIZE][MAX_SIZE]u8 = undefined;
+    @memset(&grid, [_]u8{'.'} ** MAX_SIZE);
 
-    // Allocate array for grid (mutable for part 2)
-    const grid = try allocator.alloc([]u8, line_count);
-    defer {
-        for (grid) |row| {
-            allocator.free(row);
-        }
-        allocator.free(grid);
-    }
+    var rows: usize = 0;
+    var cols: usize = 0;
+    var start_x: usize = 0;
+    var start_y: usize = 0;
+    var start_dir: usize = 0;
 
-    // Fill the grid array with mutable copies
-    var line_idx: usize = 0;
     var lines = std.mem.splitSequence(u8, content, "\n");
     while (lines.next()) |line| {
-        if (line.len > 0) {
-            grid[line_idx] = try allocator.dupe(u8, line);
-            line_idx += 1;
-        }
-    }
+        if (line.len == 0) continue;
 
-    // Find the guard's starting position and direction
-    var guard_pos: Position = undefined;
-    var guard_dir: Direction = undefined;
-    var found = false;
+        if (cols == 0) cols = line.len;
 
-    for (grid, 0..) |row, y| {
-        for (row, 0..) |cell, x| {
-            switch (cell) {
+        for (line, 0..) |char, j| {
+            grid[rows][j] = char;
+
+            // Find starting position and direction
+            switch (char) {
                 '^' => {
-                    guard_pos = .{ .x = @intCast(x), .y = @intCast(y) };
-                    guard_dir = .North;
-                    found = true;
-                },
-                'v' => {
-                    guard_pos = .{ .x = @intCast(x), .y = @intCast(y) };
-                    guard_dir = .South;
-                    found = true;
-                },
-                '<' => {
-                    guard_pos = .{ .x = @intCast(x), .y = @intCast(y) };
-                    guard_dir = .West;
-                    found = true;
+                    start_x = rows;
+                    start_y = j;
+                    start_dir = 0; // up
+                    grid[rows][j] = '.'; // Replace with empty space
                 },
                 '>' => {
-                    guard_pos = .{ .x = @intCast(x), .y = @intCast(y) };
-                    guard_dir = .East;
-                    found = true;
+                    start_x = rows;
+                    start_y = j;
+                    start_dir = 1; // right
+                    grid[rows][j] = '.';
+                },
+                'v' => {
+                    start_x = rows;
+                    start_y = j;
+                    start_dir = 2; // down
+                    grid[rows][j] = '.';
+                },
+                '<' => {
+                    start_x = rows;
+                    start_y = j;
+                    start_dir = 3; // left
+                    grid[rows][j] = '.';
                 },
                 else => {},
             }
-            if (found) break;
         }
-        if (found) break;
+        rows += 1;
     }
 
-    // Part 1: Simulate normal patrol
-    var visited = try simulatePatrol(allocator, grid, guard_pos, guard_dir);
-    defer visited.deinit();
+    // Part 1: Count visited positions
+    var visited_count: usize = 0;
+    _ = simulate(&grid, rows, cols, start_x, start_y, start_dir, null, null, true, &visited_count);
+    std.debug.print("Part 1: {d}\n", .{visited_count});
 
-    const part1 = visited.count();
-    std.debug.print("Part 1: {d}\n", .{part1});
+    // Part 2: Try placing an obstruction at each empty position (except start)
+    var loop_positions: usize = 0;
+    var dummy: usize = 0;
 
-    // Part 2: Count positions where adding an obstruction creates a loop
-    var loop_count: usize = 0;
+    for (0..rows) |r| {
+        for (0..cols) |c| {
+            // Skip if not empty or is starting position
+            if (grid[r][c] != '.' or (r == start_x and c == start_y)) {
+                continue;
+            }
 
-    var iter = visited.keyIterator();
-    while (iter.next()) |pos| {
-        // Skip the starting position
-        if (pos.x == guard_pos.x and pos.y == guard_pos.y) {
-            continue;
+            // Simulate with obstruction at (r, c)
+            if (simulate(&grid, rows, cols, start_x, start_y, start_dir, r, c, false, &dummy)) {
+                loop_positions += 1;
+            }
         }
-
-        // Place obstruction
-        const y_idx: usize = @intCast(pos.y);
-        const x_idx: usize = @intCast(pos.x);
-        const original = grid[y_idx][x_idx];
-        grid[y_idx][x_idx] = '#';
-
-        // Check if this creates a loop
-        if (try detectLoop(allocator, grid, guard_pos, guard_dir)) {
-            loop_count += 1;
-        }
-
-        // Remove obstruction
-        grid[y_idx][x_idx] = original;
     }
 
-    std.debug.print("Part 2: {d}\n", .{loop_count});
+    std.debug.print("Part 2: {d}\n", .{loop_positions});
 }

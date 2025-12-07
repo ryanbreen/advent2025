@@ -1,184 +1,211 @@
-use std::collections::HashSet;
+use std::convert::TryInto;
 use std::fs;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum Direction {
-    Up,
-    Down,
-    Left,
-    Right,
+const MAX_SIZE: usize = 200;
+
+// Direction vectors: up, right, down, left
+const DX: [i32; 4] = [-1, 0, 1, 0];
+const DY: [i32; 4] = [0, 1, 0, -1];
+
+struct Grid {
+    data: Box<[[u8; MAX_SIZE]; MAX_SIZE]>,
+    rows: usize,
+    cols: usize,
+    start_x: usize,
+    start_y: usize,
+    start_dir: usize,
 }
 
-impl Direction {
-    fn turn_right(&self) -> Direction {
-        match self {
-            Direction::Up => Direction::Right,
-            Direction::Right => Direction::Down,
-            Direction::Down => Direction::Left,
-            Direction::Left => Direction::Up,
+fn parse_input(input: &str) -> Grid {
+    // Use vec to allocate on heap, then convert to box
+    let mut data = vec![[0u8; MAX_SIZE]; MAX_SIZE];
+    let mut rows = 0;
+    let mut cols = 0;
+    let mut start_x = 0;
+    let mut start_y = 0;
+    let mut start_dir = 0;
+
+    for (row, line) in input.lines().enumerate() {
+        if line.is_empty() {
+            continue;
         }
-    }
-
-    fn delta(&self) -> (i32, i32) {
-        match self {
-            Direction::Up => (-1, 0),
-            Direction::Down => (1, 0),
-            Direction::Left => (0, -1),
-            Direction::Right => (0, 1),
+        if cols == 0 {
+            cols = line.len();
         }
-    }
-}
-
-fn parse_input(input: &str) -> (Vec<Vec<char>>, (usize, usize), Direction) {
-    let grid: Vec<Vec<char>> = input.lines().map(|line| line.chars().collect()).collect();
-
-    // Find starting position and direction
-    let mut start_pos = (0, 0);
-    let mut start_dir = Direction::Up;
-
-    for (row, line) in grid.iter().enumerate() {
-        for (col, &ch) in line.iter().enumerate() {
+        for (col, ch) in line.bytes().enumerate() {
+            data[row][col] = ch;
             match ch {
-                '^' => {
-                    start_pos = (row, col);
-                    start_dir = Direction::Up;
+                b'^' => {
+                    start_x = row;
+                    start_y = col;
+                    start_dir = 0;
+                    data[row][col] = b'.';
                 }
-                'v' => {
-                    start_pos = (row, col);
-                    start_dir = Direction::Down;
+                b'>' => {
+                    start_x = row;
+                    start_y = col;
+                    start_dir = 1;
+                    data[row][col] = b'.';
                 }
-                '<' => {
-                    start_pos = (row, col);
-                    start_dir = Direction::Left;
+                b'v' => {
+                    start_x = row;
+                    start_y = col;
+                    start_dir = 2;
+                    data[row][col] = b'.';
                 }
-                '>' => {
-                    start_pos = (row, col);
-                    start_dir = Direction::Right;
+                b'<' => {
+                    start_x = row;
+                    start_y = col;
+                    start_dir = 3;
+                    data[row][col] = b'.';
                 }
                 _ => {}
             }
         }
+        rows = row + 1;
     }
 
-    (grid, start_pos, start_dir)
+    // Convert vec to boxed array
+    let data: Box<[[u8; MAX_SIZE]; MAX_SIZE]> = data.try_into().unwrap();
+
+    Grid {
+        data,
+        rows,
+        cols,
+        start_x,
+        start_y,
+        start_dir,
+    }
 }
 
-fn simulate_guard(grid: &Vec<Vec<char>>, start_pos: (usize, usize), start_dir: Direction) -> usize {
-    let rows = grid.len();
-    let cols = if rows > 0 { grid[0].len() } else { 0 };
+// Simulate guard movement for part1
+// Returns (visited count, set of visited positions)
+fn simulate_part1(grid: &Grid) -> (usize, Vec<(usize, usize)>) {
+    let mut visited = [[false; MAX_SIZE]; MAX_SIZE];
+    let mut path = Vec::new();
 
-    let mut visited = HashSet::new();
-    let mut pos = start_pos;
-    let mut dir = start_dir;
+    let mut x = grid.start_x;
+    let mut y = grid.start_y;
+    let mut dir = grid.start_dir;
 
-    // Mark starting position as visited
-    visited.insert(pos);
+    visited[x][y] = true;
+    path.push((x, y));
 
     loop {
-        // Calculate next position
-        let (dr, dc) = dir.delta();
-        let next_row = pos.0 as i32 + dr;
-        let next_col = pos.1 as i32 + dc;
+        // Try to move forward
+        let next_x = x as i32 + DX[dir];
+        let next_y = y as i32 + DY[dir];
 
-        // Check if guard would leave the map
-        if next_row < 0 || next_row >= rows as i32 || next_col < 0 || next_col >= cols as i32 {
-            break;
+        // Check if we're leaving the map
+        if next_x < 0 || next_x >= grid.rows as i32 || next_y < 0 || next_y >= grid.cols as i32 {
+            return (path.len(), path);
         }
 
-        let next_pos = (next_row as usize, next_col as usize);
+        let next_x = next_x as usize;
+        let next_y = next_y as usize;
 
-        // Check if there's an obstacle ahead
-        if grid[next_pos.0][next_pos.1] == '#' {
+        // Check if there's an obstacle
+        if grid.data[next_x][next_y] == b'#' {
             // Turn right
-            dir = dir.turn_right();
+            dir = (dir + 1) % 4;
         } else {
             // Move forward
-            pos = next_pos;
-            visited.insert(pos);
+            x = next_x;
+            y = next_y;
+
+            if !visited[x][y] {
+                visited[x][y] = true;
+                path.push((x, y));
+            }
         }
     }
-
-    visited.len()
 }
 
-fn part1(input: &str) -> usize {
-    let (grid, start_pos, start_dir) = parse_input(input);
-    simulate_guard(&grid, start_pos, start_dir)
-}
-
-fn check_loop(grid: &Vec<Vec<char>>, start_pos: (usize, usize), start_dir: Direction) -> bool {
-    let rows = grid.len();
-    let cols = if rows > 0 { grid[0].len() } else { 0 };
-
-    // Track states (position, direction) to detect loops
-    let mut states = HashSet::new();
-    let mut pos = start_pos;
-    let mut dir = start_dir;
+// Simulate guard movement for part2 with obstruction
+// Uses version numbers instead of clearing the array
+// Returns true if guard gets stuck in a loop
+fn simulate_with_obstruction(
+    grid: &Grid,
+    obstruction_x: usize,
+    obstruction_y: usize,
+    state_visited: &mut [[[u32; 4]; MAX_SIZE]; MAX_SIZE],
+    version: u32,
+) -> bool {
+    let mut x = grid.start_x;
+    let mut y = grid.start_y;
+    let mut dir = grid.start_dir;
 
     loop {
-        // If we've seen this state before, we're in a loop
-        if !states.insert((pos, dir)) {
+        // Check if we've seen this state before (loop detection)
+        if state_visited[x][y][dir] == version {
             return true;
         }
+        state_visited[x][y][dir] = version;
 
-        // Calculate next position
-        let (dr, dc) = dir.delta();
-        let next_row = pos.0 as i32 + dr;
-        let next_col = pos.1 as i32 + dc;
+        // Try to move forward
+        let next_x = x as i32 + DX[dir];
+        let next_y = y as i32 + DY[dir];
 
-        // Check if guard would leave the map
-        if next_row < 0 || next_row >= rows as i32 || next_col < 0 || next_col >= cols as i32 {
+        // Check if we're leaving the map
+        if next_x < 0 || next_x >= grid.rows as i32 || next_y < 0 || next_y >= grid.cols as i32 {
             return false;
         }
 
-        let next_pos = (next_row as usize, next_col as usize);
+        let next_x = next_x as usize;
+        let next_y = next_y as usize;
 
-        // Check if there's an obstacle ahead
-        if grid[next_pos.0][next_pos.1] == '#' {
+        // Check if there's an obstacle
+        let is_obstacle = grid.data[next_x][next_y] == b'#'
+            || (next_x == obstruction_x && next_y == obstruction_y);
+
+        if is_obstacle {
             // Turn right
-            dir = dir.turn_right();
+            dir = (dir + 1) % 4;
         } else {
             // Move forward
-            pos = next_pos;
+            x = next_x;
+            y = next_y;
         }
     }
 }
 
-fn part2(input: &str) -> usize {
-    let (mut grid, start_pos, start_dir) = parse_input(input);
-    let rows = grid.len();
-    let cols = if rows > 0 { grid[0].len() } else { 0 };
+fn part1(grid: &Grid) -> (usize, Vec<(usize, usize)>) {
+    simulate_part1(grid)
+}
 
-    let mut count = 0;
+fn part2(grid: &Grid, path: &[(usize, usize)]) -> usize {
+    let mut loop_positions = 0;
 
-    // Try placing an obstruction at each position
-    for row in 0..rows {
-        for col in 0..cols {
-            // Skip if there's already an obstacle or if it's the starting position
-            if grid[row][col] == '#' || (row, col) == start_pos {
-                continue;
-            }
+    // Allocate state_visited once on heap and reuse with version numbers
+    let mut state_visited: Box<[[[u32; 4]; MAX_SIZE]; MAX_SIZE]> =
+        vec![[[0u32; 4]; MAX_SIZE]; MAX_SIZE].try_into().unwrap();
+    let mut version = 0u32;
 
-            // Place temporary obstruction
-            grid[row][col] = '#';
+    // Only try placing obstructions on the original path (excluding start)
+    // This is a significant optimization - we don't need to check positions
+    // the guard would never reach anyway
+    for &(r, c) in path.iter().skip(1) {
+        // Skip if there's already an obstacle (shouldn't happen on path, but be safe)
+        if grid.data[r][c] == b'#' {
+            continue;
+        }
 
-            // Check if this creates a loop
-            if check_loop(&grid, start_pos, start_dir) {
-                count += 1;
-            }
-
-            // Remove the obstruction
-            grid[row][col] = '.';
+        version += 1;
+        // Simulate with obstruction at (r, c)
+        if simulate_with_obstruction(grid, r, c, &mut state_visited, version) {
+            loop_positions += 1;
         }
     }
 
-    count
+    loop_positions
 }
 
 fn main() {
     let input = fs::read_to_string("../input.txt")
         .expect("Failed to read input file");
 
-    println!("Part 1: {}", part1(&input));
-    println!("Part 2: {}", part2(&input));
+    let grid = parse_input(&input);
+    let (count, path) = part1(&grid);
+    println!("Part 1: {}", count);
+    println!("Part 2: {}", part2(&grid, &path));
 }

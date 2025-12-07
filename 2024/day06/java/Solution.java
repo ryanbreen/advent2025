@@ -1,304 +1,149 @@
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 public class Solution {
-    private static class Position {
-        int row, col;
+    // Direction indices: 0=Up, 1=Right, 2=Down, 3=Left
+    private static final int[] DR = {-1, 0, 1, 0};
+    private static final int[] DC = {0, 1, 0, -1};
 
-        Position(int row, int col) {
-            this.row = row;
-            this.col = col;
-        }
+    private static int rows, cols;
+    private static char[][] grid;
+    private static int startRow, startCol, startDir;
 
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            Position position = (Position) o;
-            return row == position.row && col == position.col;
-        }
+    // Flat array for state tracking - better cache performance
+    // Index = (row * cols + col) * 4 + dir
+    private static int[] stateVersion;
+    private static int currentVersion = 0;
 
-        @Override
-        public int hashCode() {
-            return 31 * row + col;
-        }
-    }
+    // Separate array for tracking original visited positions
+    private static boolean[][] originalPath;
+    private static int part1Answer = -1;
 
-    private static class Direction {
-        int dRow, dCol;
+    private static void parseGrid(List<String> lines) {
+        rows = lines.size();
+        cols = lines.get(0).length();
+        grid = new char[rows][cols];
+        stateVersion = new int[rows * cols * 4];
+        originalPath = new boolean[rows][cols];
+        currentVersion = 0;
+        part1Answer = -1;
 
-        Direction(int dRow, int dCol) {
-            this.dRow = dRow;
-            this.dCol = dCol;
-        }
+        for (int r = 0; r < rows; r++) {
+            String line = lines.get(r);
+            for (int c = 0; c < line.length(); c++) {
+                char ch = line.charAt(c);
+                grid[r][c] = ch;
 
-        // Turn right 90 degrees
-        Direction turnRight() {
-            // Up (−1,0) → Right (0,1)
-            // Right (0,1) → Down (1,0)
-            // Down (1,0) → Left (0,−1)
-            // Left (0,−1) → Up (−1,0)
-            return new Direction(dCol, -dRow);
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            Direction direction = (Direction) o;
-            return dRow == direction.dRow && dCol == direction.dCol;
-        }
-
-        @Override
-        public int hashCode() {
-            return 31 * dRow + dCol;
+                if (ch == '^') {
+                    startRow = r; startCol = c; startDir = 0;
+                    grid[r][c] = '.';
+                } else if (ch == '>') {
+                    startRow = r; startCol = c; startDir = 1;
+                    grid[r][c] = '.';
+                } else if (ch == 'v') {
+                    startRow = r; startCol = c; startDir = 2;
+                    grid[r][c] = '.';
+                } else if (ch == '<') {
+                    startRow = r; startCol = c; startDir = 3;
+                    grid[r][c] = '.';
+                }
+            }
         }
     }
 
-    private static class State {
-        Position pos;
-        Direction dir;
+    // Get original visited path (for part1 and part2 optimization)
+    private static int getOriginalPath() {
+        if (part1Answer >= 0) return part1Answer;
 
-        State(Position pos, Direction dir) {
-            this.pos = pos;
-            this.dir = dir;
+        int row = startRow, col = startCol, dir = startDir;
+        int count = 0;
+
+        while (true) {
+            if (!originalPath[row][col]) {
+                originalPath[row][col] = true;
+                count++;
+            }
+
+            int nextRow = row + DR[dir];
+            int nextCol = col + DC[dir];
+
+            if (nextRow < 0 || nextRow >= rows || nextCol < 0 || nextCol >= cols) {
+                part1Answer = count;
+                return count;
+            }
+
+            if (grid[nextRow][nextCol] == '#') {
+                dir = (dir + 1) & 3;
+            } else {
+                row = nextRow;
+                col = nextCol;
+            }
         }
+    }
 
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            State state = (State) o;
-            return pos.equals(state.pos) && dir.equals(state.dir);
-        }
+    // Simulate with obstruction, returns true if loop detected
+    private static boolean detectsLoop(int obsRow, int obsCol) {
+        // Increment version to "clear" stateVersion array in O(1)
+        currentVersion++;
 
-        @Override
-        public int hashCode() {
-            return 31 * pos.hashCode() + dir.hashCode();
+        int row = startRow, col = startCol, dir = startDir;
+
+        while (true) {
+            // Flat index calculation
+            int stateIdx = (row * cols + col) * 4 + dir;
+
+            // Loop detection check using version comparison
+            if (stateVersion[stateIdx] == currentVersion) {
+                return true;  // Loop detected
+            }
+            stateVersion[stateIdx] = currentVersion;
+
+            int nextRow = row + DR[dir];
+            int nextCol = col + DC[dir];
+
+            // Check bounds
+            if (nextRow < 0 || nextRow >= rows || nextCol < 0 || nextCol >= cols) {
+                return false;  // Guard exits map
+            }
+
+            // Check obstacle (including temporary obstruction)
+            if (grid[nextRow][nextCol] == '#' || (nextRow == obsRow && nextCol == obsCol)) {
+                dir = (dir + 1) & 3;  // Turn right
+            } else {
+                row = nextRow;
+                col = nextCol;
+            }
         }
     }
 
     public static int part1(List<String> lines) {
-        int rows = lines.size();
-        int cols = lines.get(0).length();
-        char[][] grid = new char[rows][cols];
-
-        // Parse grid and find starting position
-        Position start = null;
-        Direction startDir = null;
-
-        for (int r = 0; r < rows; r++) {
-            String line = lines.get(r);
-            for (int c = 0; c < line.length(); c++) {
-                char ch = line.charAt(c);
-                grid[r][c] = ch;
-
-                if (ch == '^') {
-                    start = new Position(r, c);
-                    startDir = new Direction(-1, 0);  // Up
-                    grid[r][c] = '.';  // Clear starting position
-                } else if (ch == 'v') {
-                    start = new Position(r, c);
-                    startDir = new Direction(1, 0);   // Down
-                    grid[r][c] = '.';
-                } else if (ch == '<') {
-                    start = new Position(r, c);
-                    startDir = new Direction(0, -1);  // Left
-                    grid[r][c] = '.';
-                } else if (ch == '>') {
-                    start = new Position(r, c);
-                    startDir = new Direction(0, 1);   // Right
-                    grid[r][c] = '.';
-                }
-            }
-        }
-
-        // Simulate guard movement
-        Set<Position> visited = new HashSet<>();
-        Position current = start;
-        Direction dir = startDir;
-
-        while (true) {
-            // Mark current position as visited
-            visited.add(new Position(current.row, current.col));
-
-            // Calculate next position
-            int nextRow = current.row + dir.dRow;
-            int nextCol = current.col + dir.dCol;
-
-            // Check if guard leaves the map
-            if (nextRow < 0 || nextRow >= rows || nextCol < 0 || nextCol >= cols) {
-                break;
-            }
-
-            // Check if there's an obstacle ahead
-            if (grid[nextRow][nextCol] == '#') {
-                // Turn right
-                dir = dir.turnRight();
-            } else {
-                // Move forward
-                current = new Position(nextRow, nextCol);
-            }
-        }
-
-        return visited.size();
-    }
-
-    private static Set<Position> getVisitedPositions(List<String> lines) {
-        int rows = lines.size();
-        int cols = lines.get(0).length();
-        char[][] grid = new char[rows][cols];
-
-        // Parse grid and find starting position
-        Position start = null;
-        Direction startDir = null;
-
-        for (int r = 0; r < rows; r++) {
-            String line = lines.get(r);
-            for (int c = 0; c < line.length(); c++) {
-                char ch = line.charAt(c);
-                grid[r][c] = ch;
-
-                if (ch == '^') {
-                    start = new Position(r, c);
-                    startDir = new Direction(-1, 0);
-                } else if (ch == 'v') {
-                    start = new Position(r, c);
-                    startDir = new Direction(1, 0);
-                } else if (ch == '<') {
-                    start = new Position(r, c);
-                    startDir = new Direction(0, -1);
-                } else if (ch == '>') {
-                    start = new Position(r, c);
-                    startDir = new Direction(0, 1);
-                }
-            }
-        }
-
-        // Simulate guard movement to get all visited positions
-        Set<Position> visited = new HashSet<>();
-        Position current = start;
-        Direction dir = startDir;
-
-        while (true) {
-            visited.add(new Position(current.row, current.col));
-
-            int nextRow = current.row + dir.dRow;
-            int nextCol = current.col + dir.dCol;
-
-            if (nextRow < 0 || nextRow >= rows || nextCol < 0 || nextCol >= cols) {
-                break;
-            }
-
-            if (grid[nextRow][nextCol] == '#') {
-                dir = dir.turnRight();
-            } else {
-                current = new Position(nextRow, nextCol);
-            }
-        }
-
-        return visited;
-    }
-
-    private static boolean createsLoop(List<String> lines, Position obstruction) {
-        int rows = lines.size();
-        int cols = lines.get(0).length();
-        char[][] grid = new char[rows][cols];
-
-        // Parse grid and find starting position
-        Position start = null;
-        Direction startDir = null;
-
-        for (int r = 0; r < rows; r++) {
-            String line = lines.get(r);
-            for (int c = 0; c < line.length(); c++) {
-                char ch = line.charAt(c);
-                grid[r][c] = ch;
-
-                if (ch == '^') {
-                    start = new Position(r, c);
-                    startDir = new Direction(-1, 0);
-                } else if (ch == 'v') {
-                    start = new Position(r, c);
-                    startDir = new Direction(1, 0);
-                } else if (ch == '<') {
-                    start = new Position(r, c);
-                    startDir = new Direction(0, -1);
-                } else if (ch == '>') {
-                    start = new Position(r, c);
-                    startDir = new Direction(0, 1);
-                }
-            }
-        }
-
-        // Place the new obstruction
-        grid[obstruction.row][obstruction.col] = '#';
-
-        // Simulate guard movement with new obstruction
-        Set<State> states = new HashSet<>();
-        Position current = start;
-        Direction dir = startDir;
-
-        while (true) {
-            State state = new State(new Position(current.row, current.col), new Direction(dir.dRow, dir.dCol));
-
-            // If we've seen this exact state before, we're in a loop
-            if (states.contains(state)) {
-                return true;
-            }
-
-            states.add(state);
-
-            int nextRow = current.row + dir.dRow;
-            int nextCol = current.col + dir.dCol;
-
-            // Guard leaves the map
-            if (nextRow < 0 || nextRow >= rows || nextCol < 0 || nextCol >= cols) {
-                return false;
-            }
-
-            if (grid[nextRow][nextCol] == '#') {
-                dir = dir.turnRight();
-            } else {
-                current = new Position(nextRow, nextCol);
-            }
-        }
+        parseGrid(lines);
+        return getOriginalPath();
     }
 
     public static int part2(List<String> lines) {
-        // Get starting position
-        Position start = null;
-        for (int r = 0; r < lines.size(); r++) {
-            String line = lines.get(r);
-            for (int c = 0; c < line.length(); c++) {
-                char ch = line.charAt(c);
-                if (ch == '^' || ch == 'v' || ch == '<' || ch == '>') {
-                    start = new Position(r, c);
-                    break;
-                }
-            }
-            if (start != null) break;
+        // Only reparse if needed (allows sharing with part1)
+        if (grid == null || grid.length != lines.size()) {
+            parseGrid(lines);
         }
 
-        // Get all positions the guard visits in the original path
-        Set<Position> visitedPositions = getVisitedPositions(lines);
+        // First get visited positions from unobstructed path
+        getOriginalPath();
 
         int loopCount = 0;
 
-        // Try placing an obstruction at each visited position (except start)
-        for (Position pos : visitedPositions) {
-            // Can't place obstruction at starting position
-            if (pos.equals(start)) {
-                continue;
-            }
+        // Try placing obstruction at each visited position (except start)
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                // Check if position was visited in original path
+                if (!originalPath[r][c]) continue;
+                if (r == startRow && c == startCol) continue;
 
-            // Check if placing obstruction here creates a loop
-            if (createsLoop(lines, pos)) {
-                loopCount++;
+                if (detectsLoop(r, c)) {
+                    loopCount++;
+                }
             }
         }
 
@@ -308,7 +153,10 @@ public class Solution {
     public static void main(String[] args) throws IOException {
         List<String> lines = Files.readAllLines(Paths.get("../input.txt"));
 
-        int result1 = part1(lines);
+        // Parse once, use for both parts
+        parseGrid(lines);
+
+        int result1 = getOriginalPath();
         System.out.println("Part 1: " + result1);
 
         int result2 = part2(lines);
