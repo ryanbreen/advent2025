@@ -68,37 +68,49 @@ This problem is an excellent introduction to:
 
 ## Language Notes
 
-### Fast Performers
-- **C, C++, Rust**: Direct memory access, efficient loops
-- **Go, Java**: Good JIT optimization for nested loops
+### Fast Performers (~14ms)
+- **Zig, C, ARM64, Rust**: All within 1ms of each other at ~14ms. The O(n³) algorithm with small constants (n=496) is dominated by simple operations - nested loops with basic comparisons and arithmetic. Hash map lookups for edge checking are fast but the constant overhead is noticeable at this scale.
 
-### Moderate Performance
-- **Node.js, Python**: Adequate for n² with n≈500
-- **Ruby, PHP, Perl**: Slower but still reasonable
+### Mid-Tier (~40-110ms)
+- **C++**: Surprisingly 3x slower than C at 43ms. The STL map/vector abstractions add overhead for this problem's access patterns.
+- **Go**: 47ms - efficient but GC and map operations add some overhead.
+- **Java**: 110ms - JIT warmup doesn't help since runtime is short; HashMap operations are heavier than native implementations.
 
-### Functional Languages
-- **Clojure, Common Lisp**: Map/filter patterns work well here
+### Interpreted Languages (~200-800ms)
+- **Node.js, Common Lisp**: Both around 227ms - V8's JIT and SBCL's native compilation put them in similar territory.
+- **PHP**: 300ms - reasonable for a scripting language with native hash tables.
+- **Python**: 558ms - dictionary operations are well-optimized but still interpreted overhead.
+- **Ruby**: 775ms - hash operations and iteration are slower in Ruby's object model.
+
+### Slow Performers (>1s)
+- **Clojure**: 1177ms - JVM startup dominates since actual computation is fast.
+- **Perl**: 1313ms - nested loops and hash access are particularly slow; perl's strength is regex, not numerics.
+- **ColdFusion**: 3943ms - JVM startup plus Lucee engine overhead.
+- **Bash/AWK**: 4781ms - AWK handles arrays well but nested loop iteration is costly.
+
+### Key Insight
+This problem rewards languages with fast hash map implementations and efficient loop iteration. The O(n³) complexity means even small per-operation overhead compounds quickly.
 
 ## Benchmark Results
 
-| Language | Runtime (ms) | Memory (MB) | Notes |
-|----------|-------------|-------------|-------|
-| Python | TBD | TBD | Reference implementation |
-| Node.js | TBD | TBD | ES6+ implementation |
-| C | TBD | TBD | |
-| C++ | TBD | TBD | |
-| Rust | TBD | TBD | |
-| Go | TBD | TBD | |
-| Java | TBD | TBD | |
-| Ruby | TBD | TBD | |
-| PHP | TBD | TBD | |
-| Perl | TBD | TBD | |
-| Bash | TBD | TBD | AWK-based |
-| Clojure | TBD | TBD | |
-| Common Lisp | TBD | TBD | SBCL |
-| ColdFusion | TBD | TBD | |
-| Zig | TBD | TBD | |
-| ARM64/C | TBD | TBD | Optimized C |
+| Language    | Runtime (ms) | Memory (MB) |
+|-------------|--------------|-------------|
+| Zig         | 13.91        | 1.92        |
+| C           | 13.99        | 1.33        |
+| ARM64       | 14.36        | 1.50        |
+| Rust        | 14.87        | 1.64        |
+| C++         | 43.66        | 1.41        |
+| Go          | 47.29        | 4.23        |
+| Java        | 110.02       | 72.48       |
+| Common Lisp | 227.00       | 53.73       |
+| Node.js     | 231.00       | 52.52       |
+| PHP         | 300.25       | 24.91       |
+| Python      | 557.54       | 15.92       |
+| Ruby        | 774.62       | 28.78       |
+| Clojure     | 1,176.69     | 1,393.48    |
+| Perl        | 1,312.77     | 5.25        |
+| ColdFusion  | 3,943.18     | 1,034.75    |
+| Bash        | 4,781.25     | 1.98        |
 
 ## Answers
 
