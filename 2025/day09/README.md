@@ -68,11 +68,10 @@ This problem is an excellent introduction to:
 
 ## Language Notes
 
-### Fast Performers (~14ms)
-- **Zig, C, ARM64, Rust**: All within 1ms of each other at ~14ms. The O(n³) algorithm with small constants (n=496) is dominated by simple operations - nested loops with basic comparisons and arithmetic. Hash map lookups for edge checking are fast but the constant overhead is noticeable at this scale.
+### Fast Performers (~14-16ms)
+- **Zig, C, ARM64, Rust, C++**: All within 2ms of each other. The O(n³) algorithm with small constants (n=496) is dominated by simple operations - nested loops with basic comparisons and arithmetic. Using vector iteration instead of map lookups keeps C++ competitive with pure C.
 
 ### Mid-Tier (~40-110ms)
-- **C++**: Surprisingly 3x slower than C at 43ms. The STL map/vector abstractions add overhead for this problem's access patterns.
 - **Go**: 47ms - efficient but GC and map operations add some overhead.
 - **Java**: 110ms - JIT warmup doesn't help since runtime is short; HashMap operations are heavier than native implementations.
 
@@ -99,7 +98,7 @@ This problem rewards languages with fast hash map implementations and efficient 
 | C           | 13.99        | 1.33        |
 | ARM64       | 14.36        | 1.50        |
 | Rust        | 14.87        | 1.64        |
-| C++         | 43.66        | 1.41        |
+| C++         | 16.09        | 1.36        |
 | Go          | 47.29        | 4.23        |
 | Java        | 110.02       | 72.48       |
 | Common Lisp | 227.00       | 53.73       |

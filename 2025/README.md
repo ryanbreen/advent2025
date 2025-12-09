@@ -197,7 +197,7 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | C           | 13.99        | 1.33        |
 | ARM64       | 14.36        | 1.50        |
 | Rust        | 14.87        | 1.64        |
-| C++         | 43.66        | 1.41        |
+| C++         | 16.09        | 1.36        |
 | Go          | 47.29        | 4.23        |
 | Java        | 110.02       | 72.48       |
 | Common Lisp | 227.00       | 53.73       |
