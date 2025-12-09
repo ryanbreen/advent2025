@@ -38,10 +38,15 @@ BEGIN {
 
     # Initialize Union-Find for Part 1
     for (i = 0; i < n; i++) {
-        parent[i] = i
-        rank[i] = 0
-        size[i] = 1
+        parent1[i] = i
+        rank1[i] = 0
+        size1[i] = 1
+        # Part 2 Union-Find (separate)
+        parent2[i] = i
+        rank2[i] = 0
+        size2[i] = 1
     }
+    num_components2 = n
 }
 
 # Process sorted pairs
@@ -50,20 +55,20 @@ BEGIN {
     i = $2
     j = $3
 
+    # Part 1: first 1000 connections
     if (NR <= 1000) {
-        # Part 1: first 1000 connections
-        px = find(i, parent)
-        py = find(j, parent)
+        px = find1(i)
+        py = find1(j)
 
         if (px != py) {
             # Union by rank
-            if (rank[px] < rank[py]) {
+            if (rank1[px] < rank1[py]) {
                 tmp = px; px = py; py = tmp
             }
-            parent[py] = px
-            size[px] += size[py]
-            if (rank[px] == rank[py]) {
-                rank[px]++
+            parent1[py] = px
+            size1[px] += size1[py]
+            if (rank1[px] == rank1[py]) {
+                rank1[px]++
             }
         }
 
@@ -71,8 +76,8 @@ BEGIN {
             # Get component sizes
             comp_count = 0
             for (k = 0; k < n; k++) {
-                if (parent[k] == k) {
-                    comp_sizes[comp_count++] = size[k]
+                if (parent1[k] == k) {
+                    comp_sizes[comp_count++] = size1[k]
                 }
             }
 
@@ -89,53 +94,57 @@ BEGIN {
 
             part1 = comp_sizes[0] * comp_sizes[1] * comp_sizes[2]
             print "Part 1: " part1
-
-            # Reset for Part 2
-            for (k = 0; k < n; k++) {
-                parent[k] = k
-                rank[k] = 0
-                size[k] = 1
-            }
-            num_components = n
         }
     }
 
-    # Part 2: continue from connection 1001 onwards
-    if (NR <= 1000) next
+    # Part 2: process ALL pairs from the beginning with separate Union-Find
+    if (num_components2 > 1) {
+        px = find2(i)
+        py = find2(j)
 
-    px = find(i, parent)
-    py = find(j, parent)
+        if (px != py) {
+            # Union
+            if (rank2[px] < rank2[py]) {
+                tmp = px; px = py; py = tmp
+            }
+            parent2[py] = px
+            size2[px] += size2[py]
+            if (rank2[px] == rank2[py]) {
+                rank2[px]++
+            }
 
-    if (px != py) {
-        # Union
-        if (rank[px] < rank[py]) {
-            tmp = px; px = py; py = tmp
-        }
-        parent[py] = px
-        size[px] += size[py]
-        if (rank[px] == rank[py]) {
-            rank[px]++
-        }
-
-        num_components--
-        if (num_components == 1) {
-            part2 = X[i] * X[j]
-            print "Part 2: " part2
-            exit
+            num_components2--
+            if (num_components2 == 1) {
+                part2 = X[i] * X[j]
+                print "Part 2: " part2
+            }
         }
     }
 }
 
-# Iterative find with path compression
-function find(x, parent) {
+# Iterative find with path compression for Part 1
+function find1(x) {
     root = x
-    while (parent[root] != root) {
-        root = parent[root]
+    while (parent1[root] != root) {
+        root = parent1[root]
     }
-    # Path compression
-    while (parent[x] != root) {
-        tmp = parent[x]
-        parent[x] = root
+    while (parent1[x] != root) {
+        tmp = parent1[x]
+        parent1[x] = root
+        x = tmp
+    }
+    return root
+}
+
+# Iterative find with path compression for Part 2
+function find2(x) {
+    root = x
+    while (parent2[root] != root) {
+        root = parent2[root]
+    }
+    while (parent2[x] != root) {
+        tmp = parent2[x]
+        parent2[x] = root
         x = tmp
     }
     return root
