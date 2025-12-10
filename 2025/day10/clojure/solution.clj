@@ -276,7 +276,75 @@
                                                 (min min-t (reduce + (map to-int solution)))
                                                 min-t))))))))))
 
-                  ;; 3+D: use recursive search with dynamic bounds
+                  ;; 3D search with widened t1 bounds
+                  (= n-free 3)
+                  (let [bound max-j
+                        nv0 (nth null-vectors 0)
+                        nv1 (nth null-vectors 1)
+                        nv2 (nth null-vectors 2)]
+                    (loop [t0 (- bound) min-total Long/MAX_VALUE]
+                      (if (> t0 bound)
+                        (if (= min-total Long/MAX_VALUE) 0 min-total)
+                        (let [;; Compute intermediate after t0
+                              inter0 (mapv (fn [j]
+                                            (+ (particular j) (* t0 (nv0 j))))
+                                          (range n-buttons))
+
+                              ;; Compute bounds for t1 with padding
+                              [t1-low t1-high]
+                              (reduce (fn [[low high] j]
+                                       (let [p (inter0 j)
+                                             nv-j (nv1 j)]
+                                         (cond
+                                           (zero? nv-j) [low high]
+                                           ;; Add padding for fractional coefficients
+                                           (pos? nv-j) [(max low (- (/ (- p) nv-j) bound)) high]
+                                           :else [low (min high (+ (/ (- p) nv-j) bound))])))
+                                     [Double/NEGATIVE_INFINITY Double/POSITIVE_INFINITY]
+                                     (range n-buttons))
+
+                              t1-low-int (max (long (Math/ceil (double t1-low)))
+                                            (- bound))
+                              t1-high-int (min (long (Math/floor (double t1-high)))
+                                             bound)]
+
+                          (recur (inc t0)
+                                 (loop [t1 t1-low-int min-t min-total]
+                                   (if (> t1 t1-high-int)
+                                     min-t
+                                     (let [inter1 (mapv (fn [j]
+                                                         (+ (inter0 j) (* t1 (nv1 j))))
+                                                       (range n-buttons))
+
+                                           ;; Compute tight bounds for t2
+                                           [t2-low t2-high]
+                                           (reduce (fn [[low high] j]
+                                                    (let [p (inter1 j)
+                                                          nv-j (nv2 j)]
+                                                      (cond
+                                                        (zero? nv-j) [low high]
+                                                        (pos? nv-j) [(max low (/ (- p) nv-j)) high]
+                                                        :else [low (min high (/ (- p) nv-j))])))
+                                                  [Double/NEGATIVE_INFINITY Double/POSITIVE_INFINITY]
+                                                  (range n-buttons))
+
+                                           t2-low-int (long (Math/ceil (double t2-low)))
+                                           t2-high-int (long (Math/floor (double t2-high)))]
+
+                                       (recur (inc t1)
+                                              (loop [t2 t2-low-int min-t2 min-t]
+                                                (if (> t2 t2-high-int)
+                                                  min-t2
+                                                  (let [solution (mapv (fn [j]
+                                                                        (+ (inter1 j) (* t2 (nv2 j))))
+                                                                      (range n-buttons))
+                                                        valid? (every? is-nonneg-int? solution)]
+                                                    (recur (inc t2)
+                                                           (if valid?
+                                                             (min min-t2 (reduce + (map to-int solution)))
+                                                             min-t2))))))))))))))
+
+                  ;; 4+D: use recursive search with widened bounds
                   (<= n-free 6)
                   (let [bound (* 2 max-j)]
                     (letfn [(search [idx partial min-total]
@@ -286,7 +354,7 @@
                                   (min min-total (reduce + (map to-int partial)))
                                   min-total)
 
-                                ;; Compute bounds for current free var
+                                ;; Compute bounds for current free var with padding
                                 (let [nv (nth null-vectors idx)
                                       [t-low t-high]
                                       (reduce (fn [[low high] j]
@@ -299,10 +367,11 @@
                                              [Double/NEGATIVE_INFINITY Double/POSITIVE_INFINITY]
                                              (range n-buttons))
 
-                                      t-low-int (max (long (Math/ceil (double t-low)))
-                                                    (- bound))
-                                      t-high-int (min (long (Math/floor (double t-high)))
-                                                     bound)]
+                                      ;; Widen bounds to account for integrality
+                                      t-low-int (max (long (Math/ceil (- (double t-low) max-j)))
+                                                    (- (* 2 max-j)))
+                                      t-high-int (min (long (Math/floor (+ (double t-high) max-j)))
+                                                     (* 2 max-j))]
 
                                   (loop [t t-low-int min-t min-total]
                                     (if (> t t-high-int)
@@ -315,7 +384,7 @@
                       (let [result (search 0 particular Long/MAX_VALUE)]
                         (if (= result Long/MAX_VALUE) 0 result))))
 
-                  :else 0))))))))))
+                  :else 0)))))))))
 
 ;; ===== MAIN =====
 

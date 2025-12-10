@@ -261,6 +261,131 @@
                 (setf (aref particular (car pc))
                       (aref aug (cdr pc) n-cols)))
 
+              ;; Specialized 2D search
+              (when (= n-free 2)
+                (let ((min-total most-positive-fixnum)
+                      (nv0 (first null-vectors))
+                      (nv1 (second null-vectors)))
+
+                  ;; Compute initial bounds for t0
+                  (let ((t0-low most-negative-fixnum)
+                        (t0-high most-positive-fixnum))
+                    (dotimes (j n-buttons)
+                      (let ((p (aref particular j))
+                            (nv (aref nv0 j)))
+                        (cond
+                          ((> nv 0)
+                           (setf t0-low (max t0-low (/ (- p) nv))))
+                          ((< nv 0)
+                           (setf t0-high (min t0-high (/ (- p) nv)))))))
+
+                    ;; Expand bounds
+                    (setf t0-low (max (* max-j -2) (floor (- t0-low max-j))))
+                    (setf t0-high (min (* max-j 2) (ceiling (+ t0-high max-j))))
+
+                    ;; 2D search
+                    (loop for t0 from t0-low to t0-high
+                          do (let ((intermediate (make-array n-buttons)))
+                               ;; Compute intermediate = particular + t0 * nv0
+                               (dotimes (j n-buttons)
+                                 (setf (aref intermediate j)
+                                       (+ (aref particular j) (* t0 (aref nv0 j)))))
+
+                               ;; Compute bounds for t1 given t0
+                               (let ((t1-low most-negative-fixnum)
+                                     (t1-high most-positive-fixnum))
+                                 (dotimes (j n-buttons)
+                                   (let ((p (aref intermediate j))
+                                         (nv (aref nv1 j)))
+                                     (cond
+                                       ((> nv 0)
+                                        (setf t1-low (max t1-low (/ (- p) nv))))
+                                       ((< nv 0)
+                                        (setf t1-high (min t1-high (/ (- p) nv)))))))
+
+                                 (when (<= t1-low t1-high)
+                                   (loop for t1 from (ceiling t1-low) to (floor t1-high)
+                                         do (let ((valid-p t)
+                                                  (total 0))
+                                              (dotimes (j n-buttons)
+                                                (let ((val (+ (aref intermediate j)
+                                                             (* t1 (aref nv1 j)))))
+                                                  (unless (and (>= val 0) (integerp val))
+                                                    (setf valid-p nil)
+                                                    (return))
+                                                  (incf total val)))
+                                              (when valid-p
+                                                (setf min-total (min min-total total))))))))))
+
+                  (return-from solve-machine-part2
+                    (if (= min-total most-positive-fixnum) 0 min-total))))
+
+              ;; Specialized 3D search
+              (when (= n-free 3)
+                (let ((min-total most-positive-fixnum)
+                      (nv0 (first null-vectors))
+                      (nv1 (second null-vectors))
+                      (nv2 (third null-vectors))
+                      (bound max-j))
+
+                  (loop for t0 from (- bound) to bound
+                        do (let ((inter0 (make-array n-buttons)))
+                             ;; Compute inter0 = particular + t0 * nv0
+                             (dotimes (j n-buttons)
+                               (setf (aref inter0 j)
+                                     (+ (aref particular j) (* t0 (aref nv0 j)))))
+
+                             ;; Compute bounds for t1 given t0
+                             (let ((t1-low most-negative-fixnum)
+                                   (t1-high most-positive-fixnum))
+                               (dotimes (j n-buttons)
+                                 (let ((p (aref inter0 j))
+                                       (nv (aref nv1 j)))
+                                   (cond
+                                     ((> nv 0)
+                                      (setf t1-low (max t1-low (- (/ (- p) nv) bound))))
+                                     ((< nv 0)
+                                      (setf t1-high (min t1-high (+ (/ (- p) nv) bound)))))))
+
+                               (setf t1-low (max (ceiling t1-low) (- bound)))
+                               (setf t1-high (min (floor t1-high) bound))
+
+                               (loop for t1 from t1-low to t1-high
+                                     do (let ((inter1 (make-array n-buttons)))
+                                          ;; Compute inter1 = inter0 + t1 * nv1
+                                          (dotimes (j n-buttons)
+                                            (setf (aref inter1 j)
+                                                  (+ (aref inter0 j) (* t1 (aref nv1 j)))))
+
+                                          ;; Compute bounds for t2 given t0, t1
+                                          (let ((t2-low most-negative-fixnum)
+                                                (t2-high most-positive-fixnum))
+                                            (dotimes (j n-buttons)
+                                              (let ((p (aref inter1 j))
+                                                    (nv (aref nv2 j)))
+                                                (cond
+                                                  ((> nv 0)
+                                                   (setf t2-low (max t2-low (/ (- p) nv))))
+                                                  ((< nv 0)
+                                                   (setf t2-high (min t2-high (/ (- p) nv)))))))
+
+                                            (when (<= t2-low t2-high)
+                                              (loop for t2 from (ceiling t2-low) to (floor t2-high)
+                                                    do (let ((valid-p t)
+                                                             (total 0))
+                                                         (dotimes (j n-buttons)
+                                                           (let ((val (+ (aref inter1 j)
+                                                                        (* t2 (aref nv2 j)))))
+                                                             (unless (and (>= val 0) (integerp val))
+                                                               (setf valid-p nil)
+                                                               (return))
+                                                             (incf total val)))
+                                                         (when valid-p
+                                                           (setf min-total (min min-total total))))))))))))
+
+                  (return-from solve-machine-part2
+                    (if (= min-total most-positive-fixnum) 0 min-total))))
+
               ;; Search for optimal solution
               (let ((min-total most-positive-fixnum)
                     (bound (* max-j 2)))
@@ -293,8 +418,10 @@
                                         (setf t-high (min t-high (/ (- p) nv)))))))
 
                                  (when (<= t-low t-high)
-                                   (let ((t-low-int (max (ceiling t-low) (- bound)))
-                                         (t-high-int (min (floor t-high) bound)))
+                                   ;; Widen bounds to account for integrality constraints
+                                   ;; Python: max(ceil(t_low) - max_j, -max_j * 2)
+                                   (let ((t-low-int (max (- (ceiling t-low) max-j) (- bound)))
+                                         (t-high-int (min (+ (floor t-high) max-j) bound)))
                                      (loop for tt from t-low-int to t-high-int
                                            do (let ((new-partial (make-array n-buttons)))
                                                 (dotimes (j n-buttons)
