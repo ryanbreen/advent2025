@@ -133,6 +133,12 @@ temp_rat3:
 solution_vec:
     .space MAX_BUTTONS * RAT_SIZE
 
+// Floating-point versions for fast bound computation
+particular_fp:
+    .space MAX_BUTTONS * 8      // doubles
+null_vectors_fp:
+    .space MAX_BUTTONS * MAX_BUTTONS * 8    // doubles
+
 // Current matrix dimensions (for use by helper functions)
 current_n_rows:
     .space 8
@@ -1276,12 +1282,73 @@ next_null_vec:
     b       build_null_loop
 
 extract_done:
+    // Convert rationals to floating-point for fast bound computation
+    // Convert particular[]
+    load_addr x0, particular
+    load_addr x1, particular_fp
+    load_addr x2, current_n_buttons
+    ldr     x2, [x2]
+    bl      convert_rats_to_fp
+
+    // Convert null_vectors[]
+    load_addr x3, n_free_vars
+    ldr     x3, [x3]
+    cbz     x3, extract_really_done
+
+    load_addr x0, null_vectors
+    load_addr x1, null_vectors_fp
+    load_addr x2, current_n_buttons
+    ldr     x2, [x2]
+    mul     x2, x2, x3              // n_buttons * n_free_vars
+    bl      convert_rats_to_fp
+
+extract_really_done:
     ldp     x27, x28, [sp, #80]
     ldp     x25, x26, [sp, #64]
     ldp     x23, x24, [sp, #48]
     ldp     x21, x22, [sp, #32]
     ldp     x19, x20, [sp, #16]
     ldp     x29, x30, [sp], #112
+    ret
+
+// ============================================================================
+// Convert array of rationals to doubles
+// Input: x0 = rational array, x1 = double array, x2 = count
+// ============================================================================
+convert_rats_to_fp:
+    stp     x29, x30, [sp, #-48]!
+    mov     x29, sp
+    stp     x19, x20, [sp, #16]
+    stp     x21, x22, [sp, #32]
+
+    mov     x19, x0                 // rat array
+    mov     x20, x1                 // double array
+    mov     x21, x2                 // count
+    mov     x22, #0                 // index
+
+convert_loop:
+    cmp     x22, x21
+    b.ge    convert_done
+
+    // Load num/den from rational
+    add     x0, x19, x22, lsl #4
+    ldp     x1, x2, [x0]            // num, den
+
+    // Convert to double: (double)num / (double)den
+    scvtf   d0, x1                  // num as double
+    scvtf   d1, x2                  // den as double
+    fdiv    d0, d0, d1              // num/den
+
+    // Store to double array
+    str     d0, [x20, x22, lsl #3]
+
+    add     x22, x22, #1
+    b       convert_loop
+
+convert_done:
+    ldp     x21, x22, [sp, #32]
+    ldp     x19, x20, [sp, #16]
+    ldp     x29, x30, [sp], #48
     ret
 
 // ============================================================================
@@ -1352,26 +1419,109 @@ search_no_solution:
     b       search_return
 
 search_1d:
-    // Single free variable: search t from some bound
-    // Compute reasonable bounds based on joltage values
-    mov     x21, #-300              // t_low (wider heuristic)
-    mov     x22, #300               // t_high (wider heuristic)
-    mov     x23, #0x7FFF            // min_sum (large value)
-    movk    x23, #0x7FFF, lsl #16   // x23 = 0x7FFF7FFF
+    // Single free variable: compute tight bounds using FP, then search
+    load_addr x21, particular_fp
+    load_addr x22, null_vectors_fp
+
+    // Compute bounds: for each j, x_j = particular[j] + t*null[j] >= 0
+    // If null[j] > 0: t >= -particular[j]/null[j] (lower bound)
+    // If null[j] < 0: t <= -particular[j]/null[j] (upper bound)
+
+    mov     x0, #0xC079             // -1000.0 as t_low initial
+    movk    x0, #0x0000, lsl #16
+    movk    x0, #0x0000, lsl #32
+    movk    x0, #0xC08F, lsl #48
+    fmov    d2, x0                  // d2 = t_low = -1000.0
+
+    mov     x0, #0x4079             // 1000.0 as t_high initial
+    movk    x0, #0x0000, lsl #16
+    movk    x0, #0x0000, lsl #32
+    movk    x0, #0x408F, lsl #48
+    fmov    d3, x0                  // d3 = t_high = 1000.0
+
+    // Small epsilon for float comparisons
+    mov     x0, #0x3F1A             // 0.0001
+    movk    x0, #0x36E2, lsl #16
+    movk    x0, #0xEB1C, lsl #32
+    movk    x0, #0x3F1A, lsl #48
+    fmov    d4, x0                  // d4 = epsilon
+    fneg    d5, d4                  // d5 = -epsilon
+
+    mov     x24, #0                 // j = button index
+compute_1d_bounds:
+    cmp     x24, x19
+    b.ge    bounds_1d_done
+
+    // Load particular_fp[j] and null_fp[j]
+    ldr     d0, [x21, x24, lsl #3]  // p = particular_fp[j]
+    ldr     d1, [x22, x24, lsl #3]  // nv = null_fp[j]
+
+    // Check if nv > epsilon (positive)
+    fcmp    d1, d4
+    b.le    check_1d_neg
+
+    // nv > 0: bound = -p / nv, update t_low
+    fneg    d6, d0
+    fdiv    d6, d6, d1              // bound = -p/nv
+    fmaxnm  d2, d2, d6              // t_low = max(t_low, bound)
+    b       next_1d_bound
+
+check_1d_neg:
+    // Check if nv < -epsilon (negative)
+    fcmp    d1, d5
+    b.ge    check_1d_zero
+
+    // nv < 0: bound = -p / nv, update t_high
+    fneg    d6, d0
+    fdiv    d6, d6, d1
+    fminnm  d3, d3, d6              // t_high = min(t_high, bound)
+    b       next_1d_bound
+
+check_1d_zero:
+    // nv ≈ 0: if p < 0, no solution
+    fmov    d6, xzr                 // 0.0
+    fcmp    d0, d6
+    b.ge    next_1d_bound
+    // p < 0 and nv = 0 means constraint can't be satisfied
+    b       search_no_solution
+
+next_1d_bound:
+    add     x24, x24, #1
+    b       compute_1d_bounds
+
+bounds_1d_done:
+    // Check if bounds are valid
+    fcmp    d2, d3
+    b.gt    search_no_solution      // t_low > t_high, no solution
+
+    // Convert bounds to integers (ceiling for low, floor for high)
+    frintm  d6, d3                  // floor(t_high)
+    fcvtzs  x22, d6                 // t_high as int
+    frintp  d6, d2                  // ceil(t_low)
+    fcvtzs  x21, d6                 // t_low as int
+
+    // Clamp to reasonable range
+    mov     x0, #-2000
+    cmp     x21, x0
+    csel    x21, x0, x21, lt
+    mov     x0, #2000
+    cmp     x22, x0
+    csel    x22, x0, x22, gt
+
+    mov     x23, #0x7FFF
+    movk    x23, #0x7FFF, lsl #16   // min_sum = large
 
 search_1d_loop:
     cmp     x21, x22
     b.gt    search_1d_done
 
-    // Compute solution = particular + t * null_vectors[0]
-    mov     x0, x19                 // n_buttons
-    mov     x1, x21                 // t value
+    mov     x0, x19
+    mov     x1, x21
     bl      compute_solution_1d
 
-    // Check validity and sum
-    cbz     x0, search_1d_next      // invalid
+    cbz     x0, search_1d_next
     cmp     x0, x23
-    csel    x23, x0, x23, lt        // update min
+    csel    x23, x0, x23, lt
 
 search_1d_next:
     add     x21, x21, #1
@@ -1385,27 +1535,120 @@ search_1d_done:
     b       search_return
 
 search_2d:
-    // Two free variables: nested search
-    mov     x21, #-300              // t0_low (wider)
-    mov     x22, #300               // t0_high (wider)
-    mov     x23, #0x7FFF            // min_sum (large value)
-    movk    x23, #0x7FFF, lsl #16
+    // Two free variables: use FP for outer bounds, dynamic inner bounds
+    // First compute bounds for t0
+    load_addr x21, particular_fp
+    load_addr x22, null_vectors_fp
+
+    // Null vector stride in doubles = n_buttons * 8
+    mov     x0, x19
+    lsl     x28, x0, #3             // stride for null vectors (n_buttons * 8)
+
+    // Initial outer bounds: -500 to 500
+    mov     w24, #-500
+    mov     w25, #500
+    mov     x23, #0x7FFF
+    movk    x23, #0x7FFF, lsl #16   // min_sum
 
 search_2d_outer:
-    cmp     x21, x22
+    cmp     w24, w25
     b.gt    search_2d_done
 
-    mov     x24, #-300              // t1_low (wider)
-    mov     x25, #300               // t1_high (wider)
+    // For this t0, compute dynamic bounds for t1
+    // For each j: inter[j] = particular[j] + t0 * null[0][j]
+    // Then: inter[j] + t1 * null[1][j] >= 0
+
+    scvtf   d7, w24                 // t0 as double
+
+    // Initialize t1 bounds
+    mov     x0, #0x0000
+    movk    x0, #0x0000, lsl #16
+    movk    x0, #0x0000, lsl #32
+    movk    x0, #0xC08F, lsl #48    // -1000.0
+    fmov    d2, x0
+
+    mov     x0, #0x0000
+    movk    x0, #0x0000, lsl #16
+    movk    x0, #0x0000, lsl #32
+    movk    x0, #0x408F, lsl #48    // 1000.0
+    fmov    d3, x0
+
+    // Epsilon
+    mov     x0, #0x36E2
+    movk    x0, #0xEB1C, lsl #16
+    movk    x0, #0x3F1A, lsl #32
+    movk    x0, #0x0000, lsl #48
+    lsr     x0, x0, #16
+    mov     x1, #0x3F1A
+    movk    x1, #0x36E2, lsl #16
+    orr     x0, x1, x0, lsl #32
+    fmov    d4, x0                  // epsilon ~ 0.0001
+    fneg    d5, d4
+
+    mov     x26, #0                 // j
+compute_2d_inner_bounds:
+    cmp     x26, x19
+    b.ge    bounds_2d_inner_done
+
+    // inter = particular[j] + t0 * null[0][j]
+    ldr     d0, [x21, x26, lsl #3]  // particular[j]
+    ldr     d1, [x22, x26, lsl #3]  // null[0][j]
+    fmadd   d0, d7, d1, d0          // inter = p + t0*n0
+
+    // null[1][j]
+    add     x0, x22, x28            // null[1] base
+    ldr     d1, [x0, x26, lsl #3]   // null[1][j]
+
+    // Check if nv > epsilon
+    fcmp    d1, d4
+    b.le    check_2d_neg_inner
+
+    // nv > 0: t1 >= -inter/nv
+    fneg    d6, d0
+    fdiv    d6, d6, d1
+    fmaxnm  d2, d2, d6
+    b       next_2d_inner_bound
+
+check_2d_neg_inner:
+    fcmp    d1, d5
+    b.ge    next_2d_inner_bound     // nv ≈ 0, skip
+
+    // nv < 0: t1 <= -inter/nv
+    fneg    d6, d0
+    fdiv    d6, d6, d1
+    fminnm  d3, d3, d6
+
+next_2d_inner_bound:
+    add     x26, x26, #1
+    b       compute_2d_inner_bounds
+
+bounds_2d_inner_done:
+    // Check if bounds valid
+    fcmp    d2, d3
+    b.gt    search_2d_outer_next    // No valid t1 for this t0
+
+    // Convert to integer bounds
+    frintp  d6, d2
+    fcvtzs  w26, d6                 // t1_low
+    frintm  d6, d3
+    fcvtzs  w27, d6                 // t1_high
+
+    // Clamp
+    cmp     w26, #-500
+    csel    w26, w26, wzr, ge
+    mov     w0, #-500
+    csel    w26, w0, w26, lt
+    cmp     w27, #500
+    mov     w0, #500
+    csel    w27, w0, w27, gt
 
 search_2d_inner:
-    cmp     x24, x25
+    cmp     w26, w27
     b.gt    search_2d_outer_next
 
-    // Compute solution = particular + t0*null[0] + t1*null[1]
     mov     x0, x19
-    mov     x1, x21                 // t0
-    mov     x2, x24                 // t1
+    sxtw    x1, w24                 // t0
+    sxtw    x2, w26                 // t1
     bl      compute_solution_2d
 
     cbz     x0, search_2d_inner_next
@@ -1413,11 +1656,11 @@ search_2d_inner:
     csel    x23, x0, x23, lt
 
 search_2d_inner_next:
-    add     x24, x24, #1
+    add     w26, w26, #1
     b       search_2d_inner
 
 search_2d_outer_next:
-    add     x21, x21, #1
+    add     w24, w24, #1
     b       search_2d_outer
 
 search_2d_done:
@@ -1428,36 +1671,144 @@ search_2d_done:
     b       search_return
 
 search_3d:
-    // Three free variables: triple nested search
-    // Use smaller bounds since 3D is O(n^3)
-    mov     x21, #-100              // t0_low
-    mov     x22, #100               // t0_high
+    // Three free variables: nested search with dynamic bounds for t1 and t2
+    // This is critical - 6 machines have 3 free vars
+
+    load_addr x21, particular_fp
+    load_addr x22, null_vectors_fp
+
+    // Null vector stride = n_buttons * 8
+    mov     x0, x19
+    lsl     x28, x0, #3             // stride
+
+    // Outer bounds for t0: -200 to 200
+    mov     w24, #-200
+    mov     w25, #200
     mov     x23, #0x7FFF
     movk    x23, #0x7FFF, lsl #16   // min_sum
 
+    // Store n_buttons for inner loops (we'll clobber x19)
+    str     x19, [sp, #-16]!
+
 search_3d_t0:
-    cmp     x21, x22
+    cmp     w24, w25
     b.gt    search_3d_done
 
-    mov     x24, #-100              // t1_low
-    mov     x25, #100               // t1_high
+    scvtf   d8, w24                 // t0 as double (preserved across inner)
+
+    // Compute bounds for t1 given t0
+    // inter0[j] = particular[j] + t0 * null[0][j]
+    // We need: inter0[j] + t1*null[1][j] + t2*null[2][j] >= 0
+
+    // For now, use fixed bounds for t1, compute dynamic for t2
+    mov     w16, #-200              // t1_low
+    mov     w17, #200               // t1_high
 
 search_3d_t1:
-    cmp     x24, x25
+    cmp     w16, w17
     b.gt    search_3d_t0_next
 
-    mov     x26, #-100              // t2_low
-    mov     x27, #100               // t2_high
+    scvtf   d9, w16                 // t1 as double
+
+    // Compute inter[j] = particular[j] + t0*null[0][j] + t1*null[1][j]
+    // Then compute t2 bounds from: inter[j] + t2*null[2][j] >= 0
+
+    // Initialize t2 bounds
+    mov     x0, #0x0000
+    movk    x0, #0x0000, lsl #16
+    movk    x0, #0x0000, lsl #32
+    movk    x0, #0xC08F, lsl #48    // -1000.0
+    fmov    d2, x0
+
+    mov     x0, #0x0000
+    movk    x0, #0x0000, lsl #16
+    movk    x0, #0x0000, lsl #32
+    movk    x0, #0x408F, lsl #48    // 1000.0
+    fmov    d3, x0
+
+    // Epsilon
+    mov     x0, #0x36E2
+    movk    x0, #0xEB1C, lsl #16
+    movk    x0, #0x3F1A, lsl #32
+    movk    x0, #0x0000, lsl #48
+    lsr     x0, x0, #16
+    mov     x1, #0x3F1A
+    movk    x1, #0x36E2, lsl #16
+    orr     x0, x1, x0, lsl #32
+    fmov    d4, x0                  // epsilon
+    fneg    d5, d4
+
+    ldr     x19, [sp]               // restore n_buttons
+    mov     x26, #0                 // j
+
+compute_3d_inner_bounds:
+    cmp     x26, x19
+    b.ge    bounds_3d_inner_done
+
+    // inter = particular[j] + t0*null[0][j] + t1*null[1][j]
+    ldr     d0, [x21, x26, lsl #3]  // particular[j]
+    ldr     d1, [x22, x26, lsl #3]  // null[0][j]
+    fmadd   d0, d8, d1, d0          // + t0*n0
+
+    add     x0, x22, x28            // null[1] base
+    ldr     d1, [x0, x26, lsl #3]   // null[1][j]
+    fmadd   d0, d9, d1, d0          // + t1*n1 -> inter in d0
+
+    // null[2][j]
+    add     x0, x22, x28, lsl #1    // null[2] base (2 * stride)
+    ldr     d1, [x0, x26, lsl #3]   // null[2][j]
+
+    // Check if nv > epsilon
+    fcmp    d1, d4
+    b.le    check_3d_neg_inner
+
+    // nv > 0: t2 >= -inter/nv
+    fneg    d6, d0
+    fdiv    d6, d6, d1
+    fmaxnm  d2, d2, d6
+    b       next_3d_inner_bound
+
+check_3d_neg_inner:
+    fcmp    d1, d5
+    b.ge    next_3d_inner_bound     // nv ≈ 0
+
+    // nv < 0: t2 <= -inter/nv
+    fneg    d6, d0
+    fdiv    d6, d6, d1
+    fminnm  d3, d3, d6
+
+next_3d_inner_bound:
+    add     x26, x26, #1
+    b       compute_3d_inner_bounds
+
+bounds_3d_inner_done:
+    // Check if bounds valid
+    fcmp    d2, d3
+    b.gt    search_3d_t1_next       // No valid t2
+
+    // Convert to integer bounds
+    frintp  d6, d2
+    fcvtzs  w26, d6                 // t2_low
+    frintm  d6, d3
+    fcvtzs  w27, d6                 // t2_high
+
+    // Clamp
+    mov     w0, #-500
+    cmp     w26, w0
+    csel    w26, w0, w26, lt
+    mov     w0, #500
+    cmp     w27, w0
+    csel    w27, w0, w27, gt
 
 search_3d_t2:
-    cmp     x26, x27
+    cmp     w26, w27
     b.gt    search_3d_t1_next
 
-    // Compute solution with t0=x21, t1=x24, t2=x26
-    mov     x0, x19                 // n_buttons
-    mov     x1, x21                 // t0
-    mov     x2, x24                 // t1
-    mov     x3, x26                 // t2
+    ldr     x19, [sp]               // n_buttons
+    mov     x0, x19
+    sxtw    x1, w24                 // t0
+    sxtw    x2, w16                 // t1
+    sxtw    x3, w26                 // t2
     bl      compute_solution_3d
 
     cbz     x0, search_3d_t2_next
@@ -1465,18 +1816,19 @@ search_3d_t2:
     csel    x23, x0, x23, lt
 
 search_3d_t2_next:
-    add     x26, x26, #1
+    add     w26, w26, #1
     b       search_3d_t2
 
 search_3d_t1_next:
-    add     x24, x24, #1
+    add     w16, w16, #1
     b       search_3d_t1
 
 search_3d_t0_next:
-    add     x21, x21, #1
+    add     w24, w24, #1
     b       search_3d_t0
 
 search_3d_done:
+    add     sp, sp, #16             // cleanup saved n_buttons
     mov     x0, #0x7FFF
     movk    x0, #0x7FFF, lsl #16
     cmp     x23, x0

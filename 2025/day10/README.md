@@ -139,8 +139,8 @@ All benchmarks run on Apple Silicon (ARM64), measuring both parts combined.
 | PHP | 6,493.87 | 25.17 | GMP functions |
 | Perl | 9,525.33 | 6.97 | Math::BigRat |
 | CFML | 10,485.87 | 1,034.81 | JVM-based |
+| ARM64 | 122.33 | 1.89 | FP bounds + rational validation |
 | Bash | 15,418.12 | 16.05 | bc for arithmetic |
-| ARM64 | 25,562.17 | 1.89 | Full ILP solver in assembly |
 
 ### Performance Analysis
 
@@ -148,12 +148,12 @@ All benchmarks run on Apple Silicon (ARM64), measuring both parts combined.
 - Systems languages with efficient rational implementations
 - Java benefits from JIT compilation despite JVM startup
 
-**Medium tier (100ms - 2s)**: Common Lisp, Node.js, Clojure, Ruby
+**Medium tier (100ms - 2s)**: ARM64, Common Lisp, Node.js, Clojure, Ruby
+- ARM64 uses floating-point for bound computation, rationals only for validation (209x speedup from naive brute-force)
 - Languages with built-in or efficient rational number support
 - Clojure's high memory due to JVM and immutable data structures
 
-**Slow tier (> 2s)**: Go, Python, PHP, Perl, CFML, Bash, ARM64
+**Slow tier (> 2s)**: Go, Python, PHP, Perl, CFML, Bash
 - Go's big.Rat has allocation overhead
 - Scripting languages pay interpretation costs
-- ARM64 is slow due to brute-force search in assembly (201³ iterations for 3 free vars)
 - Bash uses external `bc` process for each arithmetic operation

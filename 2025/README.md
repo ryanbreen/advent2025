@@ -220,6 +220,7 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Zig         | 51.50        | 5.19        |
 | Java        | 69.15        | 47.86       |
 | Rust        | 71.43        | 2.12        |
+| ARM64 asm   | 122.33       | 1.89        |
 | Common Lisp | 267.90       | 88.98       |
 | Node.js     | 593.11       | 118.50      |
 | Clojure     | 1,690.80     | 1,366.59    |
@@ -230,4 +231,3 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Perl        | 9,525.33     | 6.97        |
 | ColdFusion  | 10,485.87    | 1,034.81    |
 | Bash        | 15,418.12    | 16.05       |
-| ARM64 asm   | 25,562.17    | 1.89        |
