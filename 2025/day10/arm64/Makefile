@@ -4,9 +4,10 @@
 
 all: solution rational matrix_example
 
-solution: solution.s
+solution: solution.s rational.s
+	as rational.s -o rational_sol.o
 	as solution.s -o solution.o
-	ld solution.o -o solution -lSystem -syslibroot `xcrun -sdk macosx --show-sdk-path` -e _start -arch arm64
+	ld solution.o rational_sol.o -o solution -lSystem -syslibroot `xcrun -sdk macosx --show-sdk-path` -e _start -arch arm64
 
 rational: rational.s
 	as rational.s -o rational.o
@@ -26,3 +27,6 @@ test: rational matrix_example
 
 clean:
 	rm -f *.o solution rational matrix_example
+
+run: solution
+	./solution
