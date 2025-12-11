@@ -17,6 +17,7 @@ fn parseInput(allocator: std.mem.Allocator, filename: []const u8) !Graph {
         const node_str = parts.next() orelse continue;
         const node = try allocator.dupe(u8, node_str);
 
+        // Initialize empty neighbors list using struct literal syntax
         var neighbors: std.ArrayList([]const u8) = .{};
 
         if (parts.next()) |rest| {
@@ -35,6 +36,9 @@ fn parseInput(allocator: std.mem.Allocator, filename: []const u8) !Graph {
     return graph;
 }
 
+// Pre-compute the number of paths from each node to a specific target.
+// This is used in Part 2 to compute path products for the svr -> dac -> fft -> out
+// and svr -> fft -> dac -> out orderings.
 fn countPathsToTarget(
     allocator: std.mem.Allocator,
     graph: *const Graph,
@@ -127,6 +131,11 @@ fn part1(allocator: std.mem.Allocator, graph: *const Graph) !u128 {
 }
 
 fn part2(allocator: std.mem.Allocator, graph: *const Graph) !u128 {
+    // Strategy: Pre-compute all paths from each node to each target (out, dac, fft).
+    // Then multiply path counts for each ordering:
+    // - svr->dac->fft->out: paths(svr,dac) * paths(dac,fft) * paths(fft,out)
+    // - svr->fft->dac->out: paths(svr,fft) * paths(fft,dac) * paths(dac,out)
+
     // Count paths to 'out'
     const paths_to_out = try countPathsToTarget(allocator, graph, "out");
     defer {
@@ -148,28 +157,16 @@ fn part2(allocator: std.mem.Allocator, graph: *const Graph) !u128 {
         allocator.destroy(paths_to_fft);
     }
 
-    // Paths from svr to dac
+    // Extract segment path counts
     const svr_to_dac = paths_to_dac.get("svr") orelse 0;
-
-    // Paths from dac to fft
     const dac_to_fft = paths_to_fft.get("dac") orelse 0;
-
-    // Paths from fft to out
     const fft_to_out = paths_to_out.get("fft") orelse 0;
-
-    // Paths from svr to fft
     const svr_to_fft = paths_to_fft.get("svr") orelse 0;
-
-    // Paths from fft to dac
     const fft_to_dac = paths_to_dac.get("fft") orelse 0;
-
-    // Paths from dac to out
     const dac_to_out = paths_to_out.get("dac") orelse 0;
 
-    // Paths that visit dac before fft: svr -> dac -> fft -> out
+    // Multiply path counts for each ordering
     const dac_before_fft = svr_to_dac * dac_to_fft * fft_to_out;
-
-    // Paths that visit fft before dac: svr -> fft -> dac -> out
     const fft_before_dac = svr_to_fft * fft_to_dac * dac_to_out;
 
     return dac_before_fft + fft_before_dac;

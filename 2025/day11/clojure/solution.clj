@@ -21,16 +21,15 @@
 
 (defn count-paths-to-target [graph target]
   "Returns a memoized function that counts paths from any node to target."
-  (let [memo (atom {})]
-    (fn count-paths [node]
-      (if-let [cached (@memo node)]
-        cached
-        (let [result (cond
-                       (= node target) 1
-                       (not (contains? graph node)) 0
-                       :else (reduce +' 0 (map count-paths (graph node))))]
-          (swap! memo assoc node result)
-          result)))))
+  (let [count-paths (atom nil)]
+    (reset! count-paths
+      (memoize
+        (fn [node]
+          (cond
+            (= node target) 1
+            (not (contains? graph node)) 0
+            :else (reduce +' 0 (map @count-paths (graph node)))))))
+    @count-paths))
 
 (defn part1 [graph]
   "Count all paths from 'you' to 'out' using memoization."

@@ -3,19 +3,7 @@
 ;;; Advent of Code 2025 Day 11: Reactor
 ;;; Count paths through a directed acyclic graph
 
-(defun split-string (string &optional (delimiter #\Space))
-  "Split a string by delimiter into a list of non-empty substrings."
-  (let ((result '())
-        (current ""))
-    (loop for char across string
-          do (if (char= char delimiter)
-                 (when (> (length current) 0)
-                   (push current result)
-                   (setf current ""))
-                 (setf current (concatenate 'string current (string char)))))
-    (when (> (length current) 0)
-      (push current result))
-    (nreverse result)))
+(require :uiop)
 
 (defun parse-input (filename)
   "Parse input file into a hash table graph (adjacency list)."
@@ -29,7 +17,7 @@
                           (node (subseq trimmed 0 colon-pos))
                           (rest (string-trim '(#\Space) (subseq trimmed (1+ colon-pos))))
                           (neighbors (if (> (length rest) 0)
-                                        (split-string rest #\Space)
+                                        (uiop:split-string rest :separator " ")
                                         '())))
                      (setf (gethash node graph) neighbors))))))
     graph))

@@ -1,7 +1,7 @@
 #!/usr/bin/env php
 <?php
 
-function parse_input($filename) {
+function parse_input(string $filename): array {
     $graph = [];
     $lines = file($filename, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
 
@@ -15,45 +15,21 @@ function parse_input($filename) {
     return $graph;
 }
 
-function part1($graph) {
-    $memo = [];
-
-    function count_paths($node, $graph, &$memo) {
-        if ($node === 'out') {
-            return 1;
-        }
-
-        if (isset($memo[$node])) {
-            return $memo[$node];
-        }
-
-        if (!isset($graph[$node])) {
-            $memo[$node] = 0;
-            return 0;
-        }
-
-        $total = 0;
-        foreach ($graph[$node] as $neighbor) {
-            $total += count_paths($neighbor, $graph, $memo);
-        }
-
-        $memo[$node] = $total;
-        return $total;
-    }
-
-    return count_paths('you', $graph, $memo);
+function part1(array $graph): int {
+    $counter = new PathCounter($graph);
+    return $counter->count_paths('you', 'out');
 }
 
 // Helper class for memoized path counting
 class PathCounter {
-    private $graph;
-    private $memo_cache = [];
+    private array $graph;
+    private array $memo_cache = [];
 
-    public function __construct($graph) {
+    public function __construct(array $graph) {
         $this->graph = $graph;
     }
 
-    private function count_helper($node, $target, &$memo) {
+    private function count_helper(string $node, string $target, array &$memo): int {
         if ($node === $target) {
             return 1;
         }
@@ -76,18 +52,16 @@ class PathCounter {
         return $total;
     }
 
-    public function count_paths($start_node, $target) {
-        $cache_key = $target;
-
-        if (!isset($this->memo_cache[$cache_key])) {
-            $this->memo_cache[$cache_key] = [];
+    public function count_paths(string $start_node, string $target): int {
+        if (!isset($this->memo_cache[$target])) {
+            $this->memo_cache[$target] = [];
         }
 
-        return $this->count_helper($start_node, $target, $this->memo_cache[$cache_key]);
+        return $this->count_helper($start_node, $target, $this->memo_cache[$target]);
     }
 }
 
-function part2($graph) {
+function part2(array $graph): string {
     $counter = new PathCounter($graph);
 
     // Paths that visit dac before fft: svr -> dac -> fft -> out
@@ -108,7 +82,7 @@ function part2($graph) {
     return bcadd($dac_before_fft, $fft_before_dac);
 }
 
-function main() {
+function main(): void {
     global $argc, $argv;
 
     $input_file = '../input.txt';

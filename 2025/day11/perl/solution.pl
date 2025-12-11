@@ -22,40 +22,8 @@ sub parse_input {
     return \%graph;
 }
 
-# Part 1: Count all paths from 'you' to 'out' using memoization
-sub part1 {
-    my ($graph) = @_;
-    my %memo;
-
-    sub count_paths {
-        my ($node, $graph, $memo) = @_;
-
-        return $memo->{$node} if exists $memo->{$node};
-
-        if ($node eq 'out') {
-            $memo->{$node} = 1;
-            return 1;
-        }
-
-        if (!exists $graph->{$node}) {
-            $memo->{$node} = 0;
-            return 0;
-        }
-
-        my $total = 0;
-        for my $neighbor (@{$graph->{$node}}) {
-            $total += count_paths($neighbor, $graph, $memo);
-        }
-
-        $memo->{$node} = $total;
-        return $total;
-    }
-
-    return count_paths('you', $graph, \%memo);
-}
-
-# Helper function to count paths to a specific target
-sub count_paths_to_target {
+# Count paths from start to target using memoization
+sub count_paths_memoized {
     my ($start, $target, $graph) = @_;
     my %memo;
 
@@ -66,16 +34,16 @@ sub count_paths_to_target {
         return $memo{$node} if exists $memo{$node};
 
         if ($node eq $target) {
-            $memo{$node} = Math::BigInt->new(1);
-            return $memo{$node};
+            $memo{$node} = 1;
+            return 1;
         }
 
         if (!exists $graph->{$node}) {
-            $memo{$node} = Math::BigInt->new(0);
-            return $memo{$node};
+            $memo{$node} = 0;
+            return 0;
         }
 
-        my $total = Math::BigInt->new(0);
+        my $total = 0;
         for my $neighbor (@{$graph->{$node}}) {
             $total += $count_recursive->($neighbor);
         }
@@ -87,17 +55,26 @@ sub count_paths_to_target {
     return $count_recursive->($start);
 }
 
+# Part 1: Count all paths from 'you' to 'out'
+sub part1 {
+    my ($graph) = @_;
+    return count_paths_memoized('you', 'out', $graph);
+}
+
 # Part 2: Count paths from 'svr' to 'out' that visit both 'dac' and 'fft'
+# Strategy: Compute path counts for each segment, then multiply them for each ordering:
+# - svr->dac->fft->out: paths(svr,dac) * paths(dac,fft) * paths(fft,out)
+# - svr->fft->dac->out: paths(svr,fft) * paths(fft,dac) * paths(dac,out)
 sub part2 {
     my ($graph) = @_;
 
-    # Count paths for each segment
-    my $svr_to_dac = count_paths_to_target('svr', 'dac', $graph);
-    my $svr_to_fft = count_paths_to_target('svr', 'fft', $graph);
-    my $dac_to_fft = count_paths_to_target('dac', 'fft', $graph);
-    my $fft_to_dac = count_paths_to_target('fft', 'dac', $graph);
-    my $dac_to_out = count_paths_to_target('dac', 'out', $graph);
-    my $fft_to_out = count_paths_to_target('fft', 'out', $graph);
+    # Count paths for each segment (using BigInt for large numbers)
+    my $svr_to_dac = Math::BigInt->new(count_paths_memoized('svr', 'dac', $graph));
+    my $svr_to_fft = Math::BigInt->new(count_paths_memoized('svr', 'fft', $graph));
+    my $dac_to_fft = Math::BigInt->new(count_paths_memoized('dac', 'fft', $graph));
+    my $fft_to_dac = Math::BigInt->new(count_paths_memoized('fft', 'dac', $graph));
+    my $dac_to_out = Math::BigInt->new(count_paths_memoized('dac', 'out', $graph));
+    my $fft_to_out = Math::BigInt->new(count_paths_memoized('fft', 'out', $graph));
 
     # Paths that visit dac before fft: svr -> dac -> fft -> out
     my $dac_before_fft = $svr_to_dac * $dac_to_fft * $fft_to_out;

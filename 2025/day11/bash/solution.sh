@@ -1,40 +1,32 @@
-#!/bin/bash
+#!/opt/homebrew/bin/bash
 
-# Bash 3.2 compatible solution using files for graph and cache storage
-# Create temporary directory for our data structures
-tmpdir=$(mktemp -d)
-trap "rm -rf $tmpdir" EXIT
+# Requires Bash 4.0+ for associative arrays
+# macOS ships with Bash 3.2 by default - install modern bash via homebrew:
+# brew install bash
 
-graph_file="$tmpdir/graph.txt"
-cache_file="$tmpdir/cache.txt"
+# Check bash version
+if ((BASH_VERSINFO[0] < 4)); then
+    echo "Error: This script requires Bash 4.0 or higher for associative arrays." >&2
+    echo "Current version: $BASH_VERSION" >&2
+    echo "On macOS, install with: brew install bash" >&2
+    echo "Then run with: /opt/homebrew/bin/bash solution.sh" >&2
+    exit 1
+fi
 
-# Read input and build graph file
-# Format: node|neighbor1 neighbor2 neighbor3
+# Declare associative arrays for graph and cache
+declare -A graph
+declare -A cache
+
+# Read input and build graph
 input_file="../input.txt"
 while IFS=': ' read -r node neighbors; do
     if [[ -n "$node" ]]; then
-        echo "$node|$neighbors" >> "$graph_file"
+        graph["$node"]="$neighbors"
     fi
 done < "$input_file"
 
-# Get neighbors for a node
-get_neighbors() {
-    local node="$1"
-    grep "^${node}|" "$graph_file" | cut -d'|' -f2
-}
-
-# Get cached value
-get_cache() {
-    local key="$1"
-    grep "^${key}|" "$cache_file" 2>/dev/null | cut -d'|' -f2
-}
-
-# Set cached value
-set_cache() {
-    local key="$1"
-    local value="$2"
-    echo "${key}|${value}" >> "$cache_file"
-}
+# Global variable for return value (avoids subshell overhead)
+_result=0
 
 # Count paths from node to target with memoization
 count_paths() {
@@ -43,43 +35,45 @@ count_paths() {
 
     # Base case: reached target
     if [[ "$node" == "$target" ]]; then
-        echo "1"
+        _result=1
         return
     fi
 
     # Check cache
     local cache_key="${node}_${target}"
-    local cached=$(get_cache "$cache_key")
-    if [[ -n "$cached" ]]; then
-        echo "$cached"
+    if [[ -n "${cache[$cache_key]+x}" ]]; then
+        _result="${cache[$cache_key]}"
         return
     fi
 
     # Get neighbors
-    local neighbors=$(get_neighbors "$node")
+    local neighbors="${graph[$node]}"
 
     # No neighbors means dead end
     if [[ -z "$neighbors" ]]; then
-        set_cache "$cache_key" "0"
-        echo "0"
+        cache["$cache_key"]=0
+        _result=0
         return
     fi
 
     # Sum paths through all neighbors
     local total=0
+    local neighbor_result
     for neighbor in $neighbors; do
-        local paths=$(count_paths "$neighbor" "$target")
-        total=$((total + paths))
+        count_paths "$neighbor" "$target"
+        neighbor_result=$_result
+        total=$((total + neighbor_result))
     done
 
     # Cache and return
-    set_cache "$cache_key" "$total"
-    echo "$total"
+    cache["$cache_key"]=$total
+    _result=$total
 }
 
 # Part 1: Count paths from 'you' to 'out'
-rm -f "$cache_file"
-part1=$(count_paths "you" "out")
+cache=()  # Clear cache
+count_paths "you" "out"
+part1=$_result
 echo "Part 1: $part1"
 
 # Part 2: Count paths from 'svr' to 'out' that visit both 'dac' and 'fft'
@@ -87,15 +81,21 @@ echo "Part 1: $part1"
 # paths(svr→dac) × paths(dac→fft) × paths(fft→out) +
 # paths(svr→fft) × paths(fft→dac) × paths(dac→out)
 
-# Clear cache once and calculate all needed path counts
+# Clear cache and calculate all needed path counts
 # We can reuse cache entries since all paths to same target share computation
-rm -f "$cache_file"
-svr_to_dac=$(count_paths "svr" "dac")
-dac_to_fft=$(count_paths "dac" "fft")
-fft_to_out=$(count_paths "fft" "out")
-svr_to_fft=$(count_paths "svr" "fft")
-fft_to_dac=$(count_paths "fft" "dac")
-dac_to_out=$(count_paths "dac" "out")
+cache=()  # Clear cache
+count_paths "svr" "dac"
+svr_to_dac=$_result
+count_paths "dac" "fft"
+dac_to_fft=$_result
+count_paths "fft" "out"
+fft_to_out=$_result
+count_paths "svr" "fft"
+svr_to_fft=$_result
+count_paths "fft" "dac"
+fft_to_dac=$_result
+count_paths "dac" "out"
+dac_to_out=$_result
 
 # Use bc for arbitrary precision arithmetic
 part2=$(bc <<EOF

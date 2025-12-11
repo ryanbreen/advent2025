@@ -99,17 +99,17 @@ The Part 2 answer (319,473,830,844,560) fits in 64-bit integers, but multiplicat
 | Go       | 7.71        | 4.42        |
 | C++      | 8.42        | 1.72        |
 | Rust     | 13.32       | 2.08        |
+| ARM64    | 27.49       | 15.19       |
 | Python   | 27.33       | 15.16       |
 | Common Lisp | 30.30    | 42.30       |
 | Perl     | 51.32       | 13.44       |
 | Java     | 54.12       | 51.27       |
 | Node.js  | 57.23       | 46.91       |
 | PHP      | 64.16       | 24.75       |
+| Bash     | 115.79      | 7.25        |
 | Ruby     | 124.39      | 28.19       |
 | Clojure  | 413.22      | 131.09      |
 | ColdFusion | 2700.00   | 1140.00     |
-| Bash     | 23705.83    | 2.23        |
-| ARM64    | 27.49       | 15.19       |
 
 ## Answers
 

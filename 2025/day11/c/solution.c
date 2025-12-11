@@ -76,10 +76,15 @@ Node* find_node(const char* name) {
     return NULL;
 }
 
+// Helper to create cache key
+void make_cache_key(const char* from, const char* to, char* key_buf, size_t buf_size) {
+    snprintf(key_buf, buf_size, "%s>%s", from, to);
+}
+
 // Get cached count
 int get_cached_count(const char* from, const char* to, unsigned long long* result) {
     char key[MAX_NAME_LEN * 2 + 1];
-    snprintf(key, sizeof(key), "%s>%s", from, to);
+    make_cache_key(from, to, key, sizeof(key));
 
     unsigned int h = hash(key);
     CacheEntry* current = cache[h];
@@ -98,7 +103,7 @@ int get_cached_count(const char* from, const char* to, unsigned long long* resul
 // Set cached count
 void set_cached_count(const char* from, const char* to, unsigned long long count) {
     char key[MAX_NAME_LEN * 2 + 1];
-    snprintf(key, sizeof(key), "%s>%s", from, to);
+    make_cache_key(from, to, key, sizeof(key));
 
     unsigned int h = hash(key);
 
@@ -211,7 +216,13 @@ unsigned long long part1() {
 }
 
 // Part 2: Count paths from 'svr' to 'out' that visit both 'dac' and 'fft'
+// Strategy: Compute path counts for each segment, then multiply them for each ordering:
+// - svr->dac->fft->out: paths(svr,dac) * paths(dac,fft) * paths(fft,out)
+// - svr->fft->dac->out: paths(svr,fft) * paths(fft,dac) * paths(dac,out)
 unsigned long long part2() {
+    // Note: We clear cache between each count_paths call to ensure the memoization
+    // table starts fresh for each (start, target) pair computation.
+
     // Paths that visit dac before fft: svr -> dac -> fft -> out
     clear_cache();
     unsigned long long svr_to_dac = count_paths("svr", "dac");

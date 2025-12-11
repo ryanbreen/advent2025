@@ -26,45 +26,11 @@ function parseInput(filename) {
     return graph;
 }
 
-// Part 1: Count all paths from 'you' to 'out' using memoization
-function part1(graph) {
+// Helper function to count paths from each node to a target with memoization
+function countPathsToTarget(target, graph) {
     var memo = {};
 
-    function countPaths(node, memo, graph) {
-        // Check memo cache
-        if (structKeyExists(memo, node)) {
-            return memo[node];
-        }
-
-        // Base case: reached destination
-        if (node == 'out') {
-            return 1;
-        }
-
-        // Base case: node not in graph
-        if (!structKeyExists(graph, node)) {
-            return 0;
-        }
-
-        // Recursive case: sum paths from all neighbors
-        var total = 0;
-        var neighbors = graph[node];
-        for (var neighbor in neighbors) {
-            total += countPaths(neighbor, memo, graph);
-        }
-
-        // Cache and return
-        memo[node] = total;
-        return total;
-    }
-
-    return countPaths('you', memo, graph);
-}
-
-// Part 2: Count paths from 'svr' to 'out' that visit both 'dac' and 'fft'
-function part2(graph) {
-    // Helper function to count paths from each node to a target
-    function countPathsToTarget(node, target, memo, graph) {
+    function countPaths(node) {
         // Check memo cache
         if (structKeyExists(memo, node)) {
             return memo[node];
@@ -84,7 +50,7 @@ function part2(graph) {
         var total = 0;
         var neighbors = graph[node];
         for (var neighbor in neighbors) {
-            total += countPathsToTarget(neighbor, target, memo, graph);
+            total += countPaths(neighbor);
         }
 
         // Cache and return
@@ -92,47 +58,42 @@ function part2(graph) {
         return total;
     }
 
-    // Create separate memos for each target
-    var memoOut = {};
-    var memoDac = {};
-    var memoFft = {};
+    // Return a struct with the counting function
+    return {
+        count: function(node) {
+            return countPaths(node);
+        }
+    };
+}
 
-    // Count paths to each target
-    var svrToOut = countPathsToTarget('svr', 'out', memoOut, graph);
-    var svrToDac = countPathsToTarget('svr', 'dac', memoDac, graph);
-    var svrToFft = countPathsToTarget('svr', 'fft', memoFft, graph);
+// Helper function to convert a number to BigInteger
+function toBigInteger(value) {
+    var BigInteger = createObject("java", "java.math.BigInteger");
+    return BigInteger.init(toString(value));
+}
 
-    // Reset memos for next calculations
-    memoDac = {};
-    memoFft = {};
-    memoOut = {};
+// Part 1: Count all paths from 'you' to 'out' using memoization
+function part1(graph) {
+    var pathCounter = countPathsToTarget('out', graph);
+    return pathCounter.count('you');
+}
 
-    var dacToFft = countPathsToTarget('dac', 'fft', memoFft, graph);
-    var dacToOut = countPathsToTarget('dac', 'out', memoOut, graph);
-
-    // Reset memos
-    memoDac = {};
-    memoOut = {};
-
-    var fftToDac = countPathsToTarget('fft', 'dac', memoDac, graph);
-    var fftToOut = countPathsToTarget('fft', 'out', memoOut, graph);
+// Part 2: Count paths from 'svr' to 'out' that visit both 'dac' and 'fft'
+function part2(graph) {
+    // Create path counters for each target (memos are reused across calls)
+    var pathsToOut = countPathsToTarget('out', graph);
+    var pathsToDac = countPathsToTarget('dac', graph);
+    var pathsToFft = countPathsToTarget('fft', graph);
 
     // Paths that visit dac before fft: svr -> dac -> fft -> out
+    var dacBeforeFft = toBigInteger(pathsToDac.count('svr'))
+        .multiply(toBigInteger(pathsToFft.count('dac')))
+        .multiply(toBigInteger(pathsToOut.count('fft')));
+
     // Paths that visit fft before dac: svr -> fft -> dac -> out
-    // Need to use java.math.BigInteger for large numbers
-    var BigInteger = createObject("java", "java.math.BigInteger");
-
-    var svrToDacBig = BigInteger.init(toString(svrToDac));
-    var dacToFftBig = BigInteger.init(toString(dacToFft));
-    var fftToOutBig = BigInteger.init(toString(fftToOut));
-
-    var dacBeforeFft = svrToDacBig.multiply(dacToFftBig).multiply(fftToOutBig);
-
-    var svrToFftBig = BigInteger.init(toString(svrToFft));
-    var fftToDacBig = BigInteger.init(toString(fftToDac));
-    var dacToOutBig = BigInteger.init(toString(dacToOut));
-
-    var fftBeforeDac = svrToFftBig.multiply(fftToDacBig).multiply(dacToOutBig);
+    var fftBeforeDac = toBigInteger(pathsToFft.count('svr'))
+        .multiply(toBigInteger(pathsToDac.count('fft')))
+        .multiply(toBigInteger(pathsToOut.count('dac')));
 
     var result = dacBeforeFft.add(fftBeforeDac);
 

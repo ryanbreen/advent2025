@@ -1,7 +1,9 @@
 import java.io.*;
+import java.nio.file.*;
 import java.util.*;
+import java.util.stream.*;
 
-public class solution {
+public class Solution {
     private static Map<String, List<String>> graph;
 
     public static void main(String[] args) throws IOException {
@@ -17,30 +19,21 @@ public class solution {
     }
 
     private static Map<String, List<String>> parseInput(String filename) throws IOException {
-        Map<String, List<String>> g = new HashMap<>();
-        BufferedReader reader = new BufferedReader(new FileReader(filename));
-        String line;
-
-        while ((line = reader.readLine()) != null) {
-            line = line.trim();
-            if (line.isEmpty()) continue;
-
-            String[] parts = line.split(": ");
-            String node = parts[0];
-            List<String> neighbors = new ArrayList<>();
-
-            if (parts.length > 1) {
-                String[] neighborArray = parts[1].split(" ");
-                for (String neighbor : neighborArray) {
-                    neighbors.add(neighbor);
-                }
-            }
-
-            g.put(node, neighbors);
+        try (Stream<String> lines = Files.lines(Paths.get(filename))) {
+            return lines
+                .map(String::trim)
+                .filter(line -> !line.isEmpty())
+                .collect(Collectors.toMap(
+                    line -> line.split(": ")[0],
+                    line -> {
+                        String[] parts = line.split(": ");
+                        if (parts.length > 1) {
+                            return Arrays.asList(parts[1].split(" "));
+                        }
+                        return new ArrayList<String>();
+                    }
+                ));
         }
-
-        reader.close();
-        return g;
     }
 
     private static long part1() {
@@ -49,21 +42,25 @@ public class solution {
     }
 
     private static long countPaths(String node, String target, Map<String, Long> memo) {
-        String key = node + "->" + target;
-        if (memo.containsKey(key)) {
-            return memo.get(key);
+        // Use Objects.hash for efficient memoization key
+        String key = node + ":" + target;
+
+        Long cached = memo.get(key);
+        if (cached != null) {
+            return cached;
         }
 
         if (node.equals(target)) {
             return 1;
         }
 
-        if (!graph.containsKey(node)) {
+        List<String> neighbors = graph.get(node);
+        if (neighbors == null) {
             return 0;
         }
 
         long total = 0;
-        for (String neighbor : graph.get(node)) {
+        for (String neighbor : neighbors) {
             total += countPaths(neighbor, target, memo);
         }
 

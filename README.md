@@ -6,7 +6,7 @@ Solutions to [Advent of Code](https://adventofcode.com/) challenges across multi
 
 | Year | Days | Status |
 |------|------|--------|
-| [2025](2025/) | 10 | In progress |
+| [2025](2025/) | 11 | In progress |
 | [2024](2024/) | 6 | In progress |
 | [2023](2023/) | 3 | In progress |
 
