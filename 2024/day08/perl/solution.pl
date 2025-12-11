@@ -3,12 +3,17 @@ use strict;
 use warnings;
 use v5.10;  # Enables say
 
+sub in_bounds {
+    my ($r, $c, $rows, $cols) = @_;
+    return $r >= 0 && $r < $rows && $c >= 0 && $c < $cols;
+}
+
 sub parse_input {
     my ($filename) = @_;
 
     # Read grid and remove trailing newlines
     open my $fh, '<', $filename or die "Cannot open $filename: $!";
-    my @grid = map { chomp; $_ } <$fh>;
+    chomp(my @grid = <$fh>);
     close $fh;
 
     my $rows = scalar @grid;
@@ -55,10 +60,10 @@ sub part1 {
                 my $ac2 = 2*$c2 - $c1;
 
                 # Add if within bounds
-                if ($ar1 >= 0 && $ar1 < $rows && $ac1 >= 0 && $ac1 < $cols) {
+                if (in_bounds($ar1, $ac1, $rows, $cols)) {
                     $antinodes{"$ar1,$ac1"} = 1;
                 }
-                if ($ar2 >= 0 && $ar2 < $rows && $ac2 >= 0 && $ac2 < $cols) {
+                if (in_bounds($ar2, $ac2, $rows, $cols)) {
                     $antinodes{"$ar2,$ac2"} = 1;
                 }
             }
@@ -90,7 +95,7 @@ sub part2 {
                 # Extend in both directions along the line
                 # Direction 1: from antenna 1 towards and beyond antenna 2
                 my ($r, $c) = ($r1, $c1);
-                while ($r >= 0 && $r < $rows && $c >= 0 && $c < $cols) {
+                while (in_bounds($r, $c, $rows, $cols)) {
                     $antinodes{"$r,$c"} = 1;
                     $r += $dr;
                     $c += $dc;
@@ -98,7 +103,7 @@ sub part2 {
 
                 # Direction 2: from antenna 1 away from antenna 2
                 ($r, $c) = ($r1 - $dr, $c1 - $dc);
-                while ($r >= 0 && $r < $rows && $c >= 0 && $c < $cols) {
+                while (in_bounds($r, $c, $rows, $cols)) {
                     $antinodes{"$r,$c"} = 1;
                     $r -= $dr;
                     $c -= $dc;

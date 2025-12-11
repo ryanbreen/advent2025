@@ -2,6 +2,10 @@
 
 require 'set'
 
+def in_bounds?(r, c, rows, cols)
+  r >= 0 && r < rows && c >= 0 && c < cols
+end
+
 def parse_input(filename)
   grid = File.readlines(filename, chomp: true)
 
@@ -34,8 +38,8 @@ def part1
       ar2, ac2 = 2*r2 - r1, 2*c2 - c1
 
       # Add if within bounds
-      antinodes.add([ar1, ac1]) if ar1 >= 0 && ar1 < rows && ac1 >= 0 && ac1 < cols
-      antinodes.add([ar2, ac2]) if ar2 >= 0 && ar2 < rows && ac2 >= 0 && ac2 < cols
+      antinodes.add([ar1, ac1]) if in_bounds?(ar1, ac1, rows, cols)
+      antinodes.add([ar2, ac2]) if in_bounds?(ar2, ac2, rows, cols)
     end
   end
 
@@ -52,10 +56,10 @@ def part2
     positions.combination(2).each do |(r1, c1), (r2, c2)|
       dr, dc = r2 - r1, c2 - c1
 
-      # Extend in both directions along the line
+      # Extend bidirectionally along the line defined by the two antennas
       # Direction 1: from antenna 1 towards and beyond antenna 2
       r, c = r1, c1
-      while r >= 0 && r < rows && c >= 0 && c < cols
+      while in_bounds?(r, c, rows, cols)
         antinodes.add([r, c])
         r += dr
         c += dc
@@ -63,7 +67,7 @@ def part2
 
       # Direction 2: from antenna 1 away from antenna 2
       r, c = r1 - dr, c1 - dc
-      while r >= 0 && r < rows && c >= 0 && c < cols
+      while in_bounds?(r, c, rows, cols)
         antinodes.add([r, c])
         r -= dr
         c -= dc

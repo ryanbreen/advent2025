@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+"""
+Advent of Code 2024 Day 8: Resonant Collinearity
+
+Finds antinodes created by antenna pairs through geometric collinearity.
+Part 1: Specific 2:1 distance ratio points
+Part 2: All collinear grid positions
+"""
 from collections import defaultdict
 from itertools import combinations
 
@@ -17,7 +24,7 @@ def parse_input(filename: str) -> tuple[int, int, dict[str, list[tuple[int, int]
             if ch != '.':
                 antennas[ch].append((r, c))
 
-    return rows, cols, dict(antennas)
+    return rows, cols, antennas
 
 def part1() -> int:
     """Count antinodes at 2:1 distance ratio from antenna pairs."""
@@ -60,6 +67,7 @@ def part2() -> int:
                 c += dc
 
             # Direction 2: from antenna 1 away from antenna 2
+            # Start at r1-dr to avoid double-counting the antenna positions
             r, c = r1 - dr, c1 - dc
             while 0 <= r < rows and 0 <= c < cols:
                 antinodes.add((r, c))

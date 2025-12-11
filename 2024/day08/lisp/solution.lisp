@@ -29,7 +29,8 @@
   (and (>= r 0) (< r rows) (>= c 0) (< c cols)))
 
 (defun part1 (filename)
-  "Find unique antinode locations for Part 1"
+  "Calculate antinodes using 2:1 distance ratio.
+   Each antenna pair creates two antinodes on opposite sides."
   (multiple-value-bind (rows cols antennas) (parse-input filename)
     (let ((antinodes (make-hash-table :test 'equal)))
       ;; For each frequency
@@ -37,28 +38,24 @@
                  (declare (ignore freq))
                  ;; For each pair of antennas
                  (dolist (pair (combinations positions))
-                   (let* ((pos1 (car pair))
-                          (pos2 (cdr pair))
-                          (r1 (car pos1))
-                          (c1 (cdr pos1))
-                          (r2 (car pos2))
-                          (c2 (cdr pos2))
-                          ;; Antinode beyond antenna 1 (away from antenna 2)
-                          (ar1 (- (* 2 r1) r2))
-                          (ac1 (- (* 2 c1) c2))
-                          ;; Antinode beyond antenna 2 (away from antenna 1)
-                          (ar2 (- (* 2 r2) r1))
-                          (ac2 (- (* 2 c2) c1)))
-                     ;; Add if within bounds
-                     (when (in-bounds-p ar1 ac1 rows cols)
-                       (setf (gethash (cons ar1 ac1) antinodes) t))
-                     (when (in-bounds-p ar2 ac2 rows cols)
-                       (setf (gethash (cons ar2 ac2) antinodes) t)))))
+                   (destructuring-bind ((r1 . c1) . (r2 . c2)) pair
+                     ;; Antinode formula: extend line from one antenna through the other
+                     ;; For 2:1 ratio, antinode is at 2*A - B (double distance from A, opposite direction from B)
+                     (let ((ar1 (- (* 2 r1) r2))  ; Antinode beyond antenna 1 (away from antenna 2)
+                           (ac1 (- (* 2 c1) c2))
+                           (ar2 (- (* 2 r2) r1))  ; Antinode beyond antenna 2 (away from antenna 1)
+                           (ac2 (- (* 2 c2) c1)))
+                       ;; Add if within bounds
+                       (when (in-bounds-p ar1 ac1 rows cols)
+                         (setf (gethash (cons ar1 ac1) antinodes) t))
+                       (when (in-bounds-p ar2 ac2 rows cols)
+                         (setf (gethash (cons ar2 ac2) antinodes) t))))))
                antennas)
       (hash-table-count antinodes))))
 
 (defun part2 (filename)
-  "Find unique antinode locations for Part 2"
+  "Calculate antinodes at all collinear points along antenna lines.
+   Extends in both directions until out of bounds, including antenna positions."
   (multiple-value-bind (rows cols antennas) (parse-input filename)
     (let ((antinodes (make-hash-table :test 'equal)))
       ;; For each frequency
@@ -66,24 +63,22 @@
                  (declare (ignore freq))
                  ;; For each pair of antennas
                  (dolist (pair (combinations positions))
-                   (let* ((pos1 (car pair))
-                          (pos2 (cdr pair))
-                          (r1 (car pos1))
-                          (c1 (cdr pos1))
-                          (r2 (car pos2))
-                          (c2 (cdr pos2))
-                          (dr (- r2 r1))
-                          (dc (- c2 c1)))
-                     ;; Direction 1: from antenna 1 towards and beyond antenna 2
-                     (loop for r = r1 then (+ r dr)
-                           for c = c1 then (+ c dc)
-                           while (in-bounds-p r c rows cols)
-                           do (setf (gethash (cons r c) antinodes) t))
-                     ;; Direction 2: from antenna 1 away from antenna 2
-                     (loop for r = (- r1 dr) then (- r dr)
-                           for c = (- c1 dc) then (- c dc)
-                           while (in-bounds-p r c rows cols)
-                           do (setf (gethash (cons r c) antinodes) t)))))
+                   (destructuring-bind ((r1 . c1) . (r2 . c2)) pair
+                     ;; Calculate the direction vector between antennas
+                     (let ((dr (- r2 r1))
+                           (dc (- c2 c1)))
+                       ;; Direction 1: from antenna 1 towards and beyond antenna 2
+                       ;; Step by (dr, dc) starting from antenna 1
+                       (loop for r = r1 then (+ r dr)
+                             for c = c1 then (+ c dc)
+                             while (in-bounds-p r c rows cols)
+                             do (setf (gethash (cons r c) antinodes) t))
+                       ;; Direction 2: from antenna 1 away from antenna 2
+                       ;; Step by (-dr, -dc) starting from antenna 1 - dr
+                       (loop for r = (- r1 dr) then (- r dr)
+                             for c = (- c1 dc) then (- c dc)
+                             while (in-bounds-p r c rows cols)
+                             do (setf (gethash (cons r c) antinodes) t))))))
                antennas)
       (hash-table-count antinodes))))
 

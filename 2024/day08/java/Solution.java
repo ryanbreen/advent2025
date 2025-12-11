@@ -2,49 +2,25 @@ import java.io.*;
 import java.util.*;
 
 public class Solution {
-    static class Point {
-        final int r;
-        final int c;
+    record Point(int r, int c) {}
 
-        Point(int r, int c) {
-            this.r = r;
-            this.c = c;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            Point point = (Point) o;
-            return r == point.r && c == point.c;
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(r, c);
-        }
-    }
-
-    static class Input {
-        final int rows;
-        final int cols;
-        final Map<Character, List<Point>> antennas;
-
-        Input(int rows, int cols, Map<Character, List<Point>> antennas) {
-            this.rows = rows;
-            this.cols = cols;
-            this.antennas = antennas;
-        }
-    }
+    record Input(int rows, int cols, Map<Character, List<Point>> antennas) {}
 
     private static boolean inBounds(int r, int c, int rows, int cols) {
         return r >= 0 && r < rows && c >= 0 && c < cols;
     }
 
+    /**
+     * Parses the input file and extracts grid dimensions and antenna positions.
+     *
+     * @param filename the path to the input file
+     * @return an Input record containing grid dimensions and antenna positions grouped by frequency
+     * @throws IOException if the file cannot be read
+     */
     static Input parseInput(String filename) throws IOException {
-        List<String> grid = new ArrayList<>();
+        var grid = new ArrayList<String>();
 
-        try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
+        try (var br = new BufferedReader(new FileReader(filename))) {
             String line;
             while ((line = br.readLine()) != null) {
                 grid.add(line);
@@ -55,9 +31,9 @@ public class Solution {
         int cols = rows > 0 ? grid.get(0).length() : 0;
 
         // Group antenna positions by frequency
-        Map<Character, List<Point>> antennas = new HashMap<>();
+        var antennas = new HashMap<Character, List<Point>>();
         for (int r = 0; r < rows; r++) {
-            String row = grid.get(r);
+            var row = grid.get(r);
             for (int c = 0; c < row.length(); c++) {
                 char ch = row.charAt(c);
                 if (ch != '.') {
@@ -69,18 +45,24 @@ public class Solution {
         return new Input(rows, cols, antennas);
     }
 
-    static int part1() throws IOException {
-        Input input = parseInput("../input.txt");
-        Set<Point> antinodes = new HashSet<>();
+    /**
+     * Solves Part 1: counts unique antinode positions created by pairs of antennas.
+     * An antinode occurs at any point that is twice as far from one antenna as the other.
+     *
+     * @param input the parsed input containing grid dimensions and antenna positions
+     * @return the count of unique antinode positions within the grid bounds
+     */
+    static int part1(Input input) {
+        var antinodes = new HashSet<Point>();
 
-        for (Map.Entry<Character, List<Point>> entry : input.antennas.entrySet()) {
-            List<Point> positions = entry.getValue();
+        for (var entry : input.antennas.entrySet()) {
+            var positions = entry.getValue();
 
             // For each pair of antennas with same frequency
             for (int i = 0; i < positions.size(); i++) {
                 for (int j = i + 1; j < positions.size(); j++) {
-                    Point p1 = positions.get(i);
-                    Point p2 = positions.get(j);
+                    var p1 = positions.get(i);
+                    var p2 = positions.get(j);
 
                     // Calculate the two antinodes
                     // Antinode beyond antenna 1 (away from antenna 2)
@@ -104,18 +86,25 @@ public class Solution {
         return antinodes.size();
     }
 
-    static int part2() throws IOException {
-        Input input = parseInput("../input.txt");
-        Set<Point> antinodes = new HashSet<>();
+    /**
+     * Solves Part 2: counts unique antinode positions with resonant harmonics.
+     * Antinodes occur at any grid position exactly in line with at least two antennas
+     * of the same frequency, regardless of distance.
+     *
+     * @param input the parsed input containing grid dimensions and antenna positions
+     * @return the count of unique antinode positions within the grid bounds
+     */
+    static int part2(Input input) {
+        var antinodes = new HashSet<Point>();
 
-        for (Map.Entry<Character, List<Point>> entry : input.antennas.entrySet()) {
-            List<Point> positions = entry.getValue();
+        for (var entry : input.antennas.entrySet()) {
+            var positions = entry.getValue();
 
             // For each pair of antennas with same frequency
             for (int i = 0; i < positions.size(); i++) {
                 for (int j = i + 1; j < positions.size(); j++) {
-                    Point p1 = positions.get(i);
-                    Point p2 = positions.get(j);
+                    var p1 = positions.get(i);
+                    var p2 = positions.get(j);
 
                     int dr = p2.r - p1.r;
                     int dc = p2.c - p1.c;
@@ -145,10 +134,16 @@ public class Solution {
         return antinodes.size();
     }
 
+    /**
+     * Main entry point. Parses input once and runs both parts.
+     *
+     * @param args command-line arguments (unused)
+     */
     public static void main(String[] args) {
         try {
-            System.out.println("Part 1: " + part1());
-            System.out.println("Part 2: " + part2());
+            var input = parseInput("../input.txt");
+            System.out.println("Part 1: " + part1(input));
+            System.out.println("Part 2: " + part2(input));
         } catch (IOException e) {
             System.err.println("Error reading input file: " + e.getMessage());
             e.printStackTrace();

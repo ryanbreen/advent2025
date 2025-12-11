@@ -39,7 +39,7 @@ error_msg:      .asciz "Error reading file\n"
 
 .align 3
 // Grid metadata
-grid_data:      .space 4096              // Store grid (not currently used)
+// grid_data:      .space 4096           // Unused - grid stored in file_buffer only
 grid_rows:      .quad 0                  // Number of rows in grid
 grid_cols:      .quad 0                  // Number of columns in grid
 
@@ -47,18 +47,20 @@ grid_cols:      .quad 0                  // Number of columns in grid
 // For each frequency: count (32-bit) + array of positions (packed 32-bit)
 // Position encoding: (row << 16 | col) fits in 32 bits for grids up to 64x64
 antenna_counts:     .space 256 * 4       // 256 frequencies × 4 bytes per count
+                                         // Total: 1,024 bytes
 antenna_positions:  .space 256 * 64 * 4  // 256 frequencies × 64 max positions × 4 bytes
+                                         // Total: 65,536 bytes
 
 // Antinode sets: Store unique antinode positions for each part
 // Uses same packed position format: (row << 16 | col)
-antinodes_p1:       .space MAX_ANTINODES * 4
-antinodes_p2:       .space MAX_ANTINODES * 4
+antinodes_p1:       .space MAX_ANTINODES * 4  // 8192 positions × 4 bytes = 32,768 bytes
+antinodes_p2:       .space MAX_ANTINODES * 4  // 8192 positions × 4 bytes = 32,768 bytes
 antinode_count_p1:  .quad 0
 antinode_count_p2:  .quad 0
 
 // File I/O buffer
 .align 4
-file_buffer:    .space 8192              // Input file read buffer
+file_buffer:    .space 8192              // Input file read buffer (8,192 bytes)
 
 // ============================================================================
 // Code Section

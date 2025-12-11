@@ -1,5 +1,18 @@
 import { readFileSync } from 'fs';
 
+/**
+ * Create a string key for a coordinate pair.
+ * @param {number} r - Row index
+ * @param {number} c - Column index
+ * @returns {string} Coordinate key in format "r,c"
+ */
+const coordKey = (r, c) => `${r},${c}`;
+
+/**
+ * Parse input file into grid dimensions and antenna positions grouped by frequency.
+ * @param {string} filename - Path to input file
+ * @returns {{rows: number, cols: number, antennas: Map<string, Array<[number, number]>>}}
+ */
 function parseInput(filename) {
     const grid = readFileSync(filename, 'utf-8').trim().split('\n');
     const rows = grid.length;
@@ -21,6 +34,13 @@ function parseInput(filename) {
     return { rows, cols, antennas };
 }
 
+/**
+ * Calculate antinode positions for Part 1.
+ * For each antenna pair, calculate two antinodes:
+ * - One beyond antenna 1 at position 2*A1 - A2
+ * - One beyond antenna 2 at position 2*A2 - A1
+ * @returns {number} Count of unique antinode positions
+ */
 function part1() {
     const { rows, cols, antennas } = parseInput('../input.txt');
     const antinodes = new Set();
@@ -42,10 +62,10 @@ function part1() {
 
                 // Add if within bounds
                 if (ar1 >= 0 && ar1 < rows && ac1 >= 0 && ac1 < cols) {
-                    antinodes.add(`${ar1},${ac1}`);
+                    antinodes.add(coordKey(ar1, ac1));
                 }
                 if (ar2 >= 0 && ar2 < rows && ac2 >= 0 && ac2 < cols) {
-                    antinodes.add(`${ar2},${ac2}`);
+                    antinodes.add(coordKey(ar2, ac2));
                 }
             }
         }
@@ -54,6 +74,13 @@ function part1() {
     return antinodes.size;
 }
 
+/**
+ * Calculate antinode positions for Part 2.
+ * For each antenna pair, extend along the line in both directions,
+ * marking all grid positions including the antennas themselves.
+ * This accounts for resonant harmonics at any integer multiple distance.
+ * @returns {number} Count of unique antinode positions
+ */
 function part2() {
     const { rows, cols, antennas } = parseInput('../input.txt');
     const antinodes = new Set();
@@ -71,7 +98,7 @@ function part2() {
                 // Direction 1: from antenna 1 towards and beyond antenna 2
                 let r = r1, c = c1;
                 while (r >= 0 && r < rows && c >= 0 && c < cols) {
-                    antinodes.add(`${r},${c}`);
+                    antinodes.add(coordKey(r, c));
                     r += dr;
                     c += dc;
                 }
@@ -80,7 +107,7 @@ function part2() {
                 r = r1 - dr;
                 c = c1 - dc;
                 while (r >= 0 && r < rows && c >= 0 && c < cols) {
-                    antinodes.add(`${r},${c}`);
+                    antinodes.add(coordKey(r, c));
                     r -= dr;
                     c -= dc;
                 }

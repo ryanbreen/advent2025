@@ -1,5 +1,5 @@
 <cfscript>
-function parseInput(filename) {
+function parseInput(required string filename) struct {
     var fileContent = fileRead(filename);
     var lines = listToArray(fileContent, chr(10));
 
@@ -41,8 +41,11 @@ function parseInput(filename) {
     return {rows: rows, cols: cols, antennas: antennas};
 }
 
-function part1() {
-    var data = parseInput("../input.txt");
+function coordKey(required numeric r, required numeric c) string {
+    return r & "," & c;
+}
+
+function part1(required struct data) numeric {
     var rows = data.rows;
     var cols = data.cols;
     var antennas = data.antennas;
@@ -76,11 +79,11 @@ function part1() {
 
                 // Add if within bounds
                 if (ar1 >= 0 && ar1 < rows && ac1 >= 0 && ac1 < cols) {
-                    var key1 = ar1 & "," & ac1;
+                    var key1 = coordKey(ar1, ac1);
                     antinodes[key1] = true;
                 }
                 if (ar2 >= 0 && ar2 < rows && ac2 >= 0 && ac2 < cols) {
-                    var key2 = ar2 & "," & ac2;
+                    var key2 = coordKey(ar2, ac2);
                     antinodes[key2] = true;
                 }
             }
@@ -90,8 +93,7 @@ function part1() {
     return structCount(antinodes);
 }
 
-function part2() {
-    var data = parseInput("../input.txt");
+function part2(required struct data) numeric {
     var rows = data.rows;
     var cols = data.cols;
     var antennas = data.antennas;
@@ -122,7 +124,7 @@ function part2() {
                 var r = r1;
                 var c = c1;
                 while (r >= 0 && r < rows && c >= 0 && c < cols) {
-                    var key = r & "," & c;
+                    var key = coordKey(r, c);
                     antinodes[key] = true;
                     r += dr;
                     c += dc;
@@ -132,7 +134,7 @@ function part2() {
                 r = r1 - dr;
                 c = c1 - dc;
                 while (r >= 0 && r < rows && c >= 0 && c < cols) {
-                    var key = r & "," & c;
+                    var key = coordKey(r, c);
                     antinodes[key] = true;
                     r -= dr;
                     c -= dc;
@@ -145,8 +147,9 @@ function part2() {
 }
 
 // Main execution
-writeOutput("Part 1: " & part1());
+var data = parseInput("../input.txt");
+writeOutput("Part 1: " & part1(data));
 writeOutput(chr(10));
-writeOutput("Part 2: " & part2());
+writeOutput("Part 2: " & part2(data));
 writeOutput(chr(10));
 </cfscript>

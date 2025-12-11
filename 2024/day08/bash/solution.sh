@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
+# Day 8: Resonant Collinearity
+# Finds antinode positions created by antenna pairs on a grid
+# Part 1: Antinodes at 2:1 distance ratio
+# Part 2: All collinear grid points
 set -euo pipefail
 
 # Read and parse the input grid
-declare -A antennas  # frequency -> "r1,c1 r2,c2 ..." space-separated positions
+declare -A antennas  # frequency -> "r1,c1 r2,c2 ..." (space-separated row,col pairs)
 rows=0
 cols=0
 
@@ -22,6 +26,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     ((rows++))
 done < ../input.txt || true  # Prevent set -e from exiting on final read failure
 
+# Calculate Part 1 antinodes (2:1 distance ratio from antenna pairs)
 part1() {
     # Use associative array as set for unique antinode locations
     declare -A antinodes_set
@@ -59,6 +64,7 @@ part1() {
     echo "${#antinodes_set[@]}"
 }
 
+# Calculate Part 2 antinodes (all collinear grid points)
 part2() {
     # Use associative array as set for unique antinode locations
     declare -A antinodes_set

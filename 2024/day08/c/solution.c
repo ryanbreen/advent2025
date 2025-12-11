@@ -25,7 +25,15 @@ typedef struct {
 static int rows, cols;
 static AntennaGroup groups[NUM_ASCII_CHARS];
 
+static inline bool in_bounds(int r, int c) {
+    return r >= 0 && r < rows && c >= 0 && c < cols;
+}
+
 static void add_to_set(PositionSet *set, int r, int c) {
+    // Bounds checking to prevent overflow
+    if (set->count >= MAX_GRID_SIZE * MAX_GRID_SIZE) {
+        return;
+    }
     // Check if position already exists
     for (int i = 0; i < set->count; i++) {
         if (set->positions[i].r == r && set->positions[i].c == c) {
@@ -42,7 +50,7 @@ static void parse_input(const char *filename) {
     FILE *f = fopen(filename, "r");
     if (!f) {
         perror("Failed to open input file");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     char grid[MAX_GRID_SIZE][MAX_GRID_SIZE];
@@ -72,6 +80,7 @@ static void parse_input(const char *filename) {
         for (int c = 0; c < cols && grid[r][c] != '\0'; c++) {
             char ch = grid[r][c];
             if (ch != '.') {
+                // Cast to unsigned char to safely use as array index (0-127)
                 int idx = (unsigned char)ch;
                 if (groups[idx].count == 0) {
                     groups[idx].freq = ch;
@@ -113,10 +122,10 @@ static int part1(void) {
                 int ac2 = 2 * c2 - c1;
 
                 // Add if within bounds
-                if (ar1 >= 0 && ar1 < rows && ac1 >= 0 && ac1 < cols) {
+                if (in_bounds(ar1, ac1)) {
                     add_to_set(&antinodes, ar1, ac1);
                 }
-                if (ar2 >= 0 && ar2 < rows && ac2 >= 0 && ac2 < cols) {
+                if (in_bounds(ar2, ac2)) {
                     add_to_set(&antinodes, ar2, ac2);
                 }
             }
@@ -151,7 +160,7 @@ static int part2(void) {
                 // Extend in both directions along the line
                 // Direction 1: from antenna 1 towards and beyond antenna 2
                 int r = r1, c = c1;
-                while (r >= 0 && r < rows && c >= 0 && c < cols) {
+                while (in_bounds(r, c)) {
                     add_to_set(&antinodes, r, c);
                     r += dr;
                     c += dc;
@@ -160,7 +169,7 @@ static int part2(void) {
                 // Direction 2: from antenna 1 away from antenna 2
                 r = r1 - dr;
                 c = c1 - dc;
-                while (r >= 0 && r < rows && c >= 0 && c < cols) {
+                while (in_bounds(r, c)) {
                     add_to_set(&antinodes, r, c);
                     r -= dr;
                     c -= dc;

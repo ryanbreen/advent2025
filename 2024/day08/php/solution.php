@@ -1,6 +1,26 @@
 #!/usr/bin/env php
 <?php
+declare(strict_types=1);
 
+/**
+ * Creates a coordinate key string from row and column indices.
+ *
+ * @param int $r Row index
+ * @param int $c Column index
+ * @return string Coordinate key in format "r,c"
+ */
+function coordKey(int $r, int $c): string
+{
+    return $r . ',' . $c;
+}
+
+/**
+ * Parses the input file and extracts grid dimensions and antenna positions.
+ *
+ * @param string $filename Path to the input file
+ * @return array Array containing [rows, cols, antennas]
+ *               where antennas is a map of frequency => positions
+ */
 function parseInput(string $filename): array
 {
     $grid = array_map('rtrim', file($filename));
@@ -12,12 +32,12 @@ function parseInput(string $filename): array
     $antennas = [];
     for ($r = 0; $r < $rows; $r++) {
         for ($c = 0; $c < $cols; $c++) {
-            $ch = $grid[$r][$c];
-            if ($ch !== '.') {
-                if (!isset($antennas[$ch])) {
-                    $antennas[$ch] = [];
+            $freq = $grid[$r][$c];
+            if ($freq !== '.') {
+                if (!isset($antennas[$freq])) {
+                    $antennas[$freq] = [];
                 }
-                $antennas[$ch][] = [$r, $c];
+                $antennas[$freq][] = [$r, $c];
             }
         }
     }
@@ -25,9 +45,16 @@ function parseInput(string $filename): array
     return [$rows, $cols, $antennas];
 }
 
-function part1(): int
+/**
+ * Calculates the number of unique antinode positions for Part 1.
+ * Antinodes occur at positions where one antenna is twice as far from another.
+ *
+ * @param array $data Parsed input data [rows, cols, antennas]
+ * @return int Count of unique antinode positions
+ */
+function part1(array $data): int
 {
-    [$rows, $cols, $antennas] = parseInput('../input.txt');
+    [$rows, $cols, $antennas] = $data;
 
     $antinodes = [];
 
@@ -51,10 +78,10 @@ function part1(): int
 
                 // Add if within bounds
                 if ($ar1 >= 0 && $ar1 < $rows && $ac1 >= 0 && $ac1 < $cols) {
-                    $antinodes["$ar1,$ac1"] = true;
+                    $antinodes[coordKey($ar1, $ac1)] = true;
                 }
                 if ($ar2 >= 0 && $ar2 < $rows && $ac2 >= 0 && $ac2 < $cols) {
-                    $antinodes["$ar2,$ac2"] = true;
+                    $antinodes[coordKey($ar2, $ac2)] = true;
                 }
             }
         }
@@ -63,9 +90,16 @@ function part1(): int
     return count($antinodes);
 }
 
-function part2(): int
+/**
+ * Calculates the number of unique antinode positions for Part 2.
+ * Antinodes occur at all positions along the line between any two antennas.
+ *
+ * @param array $data Parsed input data [rows, cols, antennas]
+ * @return int Count of unique antinode positions
+ */
+function part2(array $data): int
 {
-    [$rows, $cols, $antennas] = parseInput('../input.txt');
+    [$rows, $cols, $antennas] = $data;
 
     $antinodes = [];
 
@@ -86,7 +120,7 @@ function part2(): int
                 $r = $r1;
                 $c = $c1;
                 while ($r >= 0 && $r < $rows && $c >= 0 && $c < $cols) {
-                    $antinodes["$r,$c"] = true;
+                    $antinodes[coordKey($r, $c)] = true;
                     $r += $dr;
                     $c += $dc;
                 }
@@ -95,7 +129,7 @@ function part2(): int
                 $r = $r1 - $dr;
                 $c = $c1 - $dc;
                 while ($r >= 0 && $r < $rows && $c >= 0 && $c < $cols) {
-                    $antinodes["$r,$c"] = true;
+                    $antinodes[coordKey($r, $c)] = true;
                     $r -= $dr;
                     $c -= $dc;
                 }
@@ -106,5 +140,7 @@ function part2(): int
     return count($antinodes);
 }
 
-echo "Part 1: " . part1() . "\n";
-echo "Part 2: " . part2() . "\n";
+// Parse input once and pass to both functions
+$data = parseInput('../input.txt');
+echo "Part 1: " . part1($data) . "\n";
+echo "Part 2: " . part2($data) . "\n";
