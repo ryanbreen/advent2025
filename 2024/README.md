@@ -12,7 +12,7 @@ Solutions implemented in 16 languages.
 | 4   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion + Kotlin, Scala, AWK |
 | 5   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 6   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
-| 7   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Clojure, Common Lisp, ColdFusion |
+| 7   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 8   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 
 ## Benchmarks
@@ -167,6 +167,9 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Clojure     | 17,571       | 1,320       |
 | Perl        | 24,006       | 196         |
 | ColdFusion  | 42,807       | 1,304       |
+| Bash        | >2 hrs*      | -           |
+
+*Bash solution is correct but impractically slow for Part 2 (3^n operator combinations)
 
 ### Day 8: Resonant Collinearity
 
