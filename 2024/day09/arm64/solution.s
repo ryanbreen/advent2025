@@ -1,23 +1,18 @@
 // Day 9: Disk Fragmenter - ARM64 Assembly (macOS)
+// OPTIMIZED: Span-based approach (no block expansion)
 //
-// Compact a fragmented disk by moving file blocks to fill gaps.
-// Part 1: Move blocks one at a time from end to leftmost free space
-// Part 2: Move whole files (highest ID first) to leftmost span that fits
+// Key insight: Work with spans (file_id, position, length) instead of
+// expanding to individual blocks. Calculate checksums mathematically.
 //
-// Algorithm:
-//   1. Parse disk map: alternating digits = file length, free space length
-//   2. Expand to block array: file ID or -1 for free space
-//   3. Part 1: Two-pointer compaction (left finds free, right finds file)
-//   4. Part 2: For each file (high ID to low), find leftmost fitting span
-//   5. Calculate checksum: sum of position * file_id
+// Checksum contribution for file f at position p with length len:
+//   f * (p + p+1 + ... + p+len-1) = f * len * p + f * len * (len-1) / 2
 
 .global _start
 .align 4
 
 // Constants
-.equ MAX_INPUT_SIZE, 20480         // 20KB input buffer
-.equ MAX_BLOCKS, 100000            // Max expanded blocks (~95KB)
-.equ EMPTY, -1                     // Marker for free space
+.equ MAX_INPUT_SIZE, 20480
+.equ MAX_SPANS, 10000          // Max number of file/free spans
 
 // Macro for loading addresses from data section
 .macro LOAD_ADDR reg, label
@@ -41,11 +36,21 @@ error_msg:      .asciz "Error reading file\n"
 // File I/O buffer
 file_buffer:    .space MAX_INPUT_SIZE
 
-// Block arrays - using 32-bit signed ints (file IDs can be large)
-// Need two separate arrays since Part 1 and Part 2 operate independently
-blocks_p1:      .space MAX_BLOCKS * 4
-blocks_p2:      .space MAX_BLOCKS * 4
-block_count:    .quad 0                 // Number of blocks after expansion
+// Span arrays: position and length for each file/free space
+file_pos:       .space MAX_SPANS * 8    // 64-bit positions
+file_len:       .space MAX_SPANS * 8    // 64-bit lengths
+free_pos:       .space MAX_SPANS * 8
+free_len:       .space MAX_SPANS * 8
+
+// Working copies for Part 2
+p2_file_pos:    .space MAX_SPANS * 8
+p2_free_pos:    .space MAX_SPANS * 8
+p2_free_len:    .space MAX_SPANS * 8
+
+// Counters
+max_file_id:    .quad 0
+num_free:       .quad 0
+total_blocks:   .quad 0
 
 // ============================================================================
 // Code Section
@@ -59,13 +64,13 @@ _start:
     // Open and read input file
     LOAD_ADDR x0, input_path
     mov     x1, #0                          // O_RDONLY
-    mov     x2, #0                          // mode (not used for O_RDONLY)
+    mov     x2, #0
     mov     x16, #5                         // open() syscall
     svc     #0x80
     cmp     x0, #0
     b.le    error_exit
 
-    mov     x19, x0                         // Save fd in x19
+    mov     x19, x0                         // Save fd
 
     // Read file
     mov     x0, x19
@@ -76,15 +81,15 @@ _start:
     cmp     x0, #0
     b.le    error_exit
 
-    mov     x20, x0                         // Save bytes read in x20
+    mov     x20, x0                         // Save bytes read
 
     // Close file
     mov     x0, x19
     mov     x16, #6                         // close() syscall
     svc     #0x80
 
-    // Parse disk map and expand to blocks
-    bl      parse_and_expand
+    // Parse disk map into spans
+    bl      parse_spans
 
     // Solve Part 1
     bl      solve_part1
@@ -122,27 +127,33 @@ error_exit:
     svc     #0x80
 
 // ============================================================================
-// parse_and_expand: Parse disk map and expand to block arrays
-// Input: file_buffer contains disk map (alternating file/free digits)
-// Output: blocks_p1 and blocks_p2 filled, block_count set
+// parse_spans: Parse disk map into file and free space spans
+// Input: file_buffer contains disk map
+// Output: file_pos[], file_len[], free_pos[], free_len[] filled
 // ============================================================================
-parse_and_expand:
+parse_spans:
     stp     x29, x30, [sp, #-16]!
     stp     x19, x20, [sp, #-16]!
     stp     x21, x22, [sp, #-16]!
     stp     x23, x24, [sp, #-16]!
+    stp     x25, x26, [sp, #-16]!
 
     LOAD_ADDR x19, file_buffer              // Input pointer
-    LOAD_ADDR x20, blocks_p1                // Output pointer (p1)
-    LOAD_ADDR x21, blocks_p2                // Output pointer (p2)
-    mov     x22, #0                         // File ID counter
-    mov     x23, #1                         // is_file flag (start with file)
-    mov     x24, #0                         // Block count
+    LOAD_ADDR x20, file_pos                 // File position array
+    LOAD_ADDR x21, file_len                 // File length array
+    LOAD_ADDR x22, free_pos                 // Free position array
+    LOAD_ADDR x23, free_len                 // Free length array
+
+    mov     x24, #0                         // Current position
+    mov     x25, #0                         // File ID counter
+    mov     x26, #0                         // Free span counter
+    mov     x27, #1                         // is_file flag
+    mov     x28, #0                         // Total file blocks
 
 parse_loop:
     ldrb    w0, [x19], #1                   // Load next character
 
-    // Check for end of input (newline, null, or non-digit)
+    // Check for end of input
     cbz     w0, parse_done
     cmp     w0, #'\n'
     b.eq    parse_done
@@ -152,249 +163,43 @@ parse_loop:
     b.gt    parse_done
 
     // Convert ASCII digit to number
-    sub     w0, w0, #'0'
+    sub     x1, x0, #'0'                    // x1 = length
 
-    // Determine what to write (file_id or -1)
-    cmp     x23, #1
-    b.eq    write_file
+    // Check if file or free space
+    cbz     x27, handle_free
 
-    // Write free space
-    mvn     w1, wzr                         // w1 = -1 (all bits set)
-    b       write_blocks
+handle_file:
+    // Store file span if length > 0
+    cbz     x1, toggle_flag
+    str     x24, [x20, x25, lsl #3]         // file_pos[file_id] = pos
+    str     x1, [x21, x25, lsl #3]          // file_len[file_id] = len
+    add     x28, x28, x1                    // total_blocks += len
+    add     x25, x25, #1                    // file_id++
+    b       update_pos
 
-write_file:
-    mov     w1, w22                         // w1 = file_id
+handle_free:
+    // Store free span if length > 0
+    cbz     x1, toggle_flag
+    str     x24, [x22, x26, lsl #3]         // free_pos[num_free] = pos
+    str     x1, [x23, x26, lsl #3]          // free_len[num_free] = len
+    add     x26, x26, #1                    // num_free++
 
-write_blocks:
-    // Write w0 blocks of value w1
-    cbz     w0, next_section                // Skip if length is 0
+update_pos:
+    add     x24, x24, x1                    // pos += len
 
-write_loop:
-    str     w1, [x20], #4                   // Store to blocks_p1
-    str     w1, [x21], #4                   // Store to blocks_p2
-    add     x24, x24, #1                    // Increment block count
-    subs    w0, w0, #1
-    b.ne    write_loop
-
-next_section:
-    // Toggle is_file flag
-    eor     x23, x23, #1
-
-    // If we just finished writing free space, increment file_id
-    cmp     x23, #1
-    b.eq    parse_loop                      // Just wrote free, now file
-    add     x22, x22, #1                    // Just wrote file, increment ID
+toggle_flag:
+    eor     x27, x27, #1                    // Toggle is_file
     b       parse_loop
 
 parse_done:
-    // Save block count
-    LOAD_ADDR x0, block_count
-    str     x24, [x0]
-
-    ldp     x23, x24, [sp], #16
-    ldp     x21, x22, [sp], #16
-    ldp     x19, x20, [sp], #16
-    ldp     x29, x30, [sp], #16
-    ret
-
-// ============================================================================
-// solve_part1: Compact by moving blocks one at a time
-// Uses two-pointer technique: left finds free space, right finds file blocks
-// Returns: checksum in x0
-// ============================================================================
-solve_part1:
-    stp     x29, x30, [sp, #-16]!
-    stp     x19, x20, [sp, #-16]!
-    stp     x21, x22, [sp, #-16]!
-
-    LOAD_ADDR x0, block_count
-    ldr     x19, [x0]                       // x19 = block_count
-    LOAD_ADDR x20, blocks_p1                // x20 = blocks array
-
-    mov     x21, #0                         // left pointer
-    sub     x22, x19, #1                    // right pointer = count - 1
-
-compact_loop:
-    cmp     x21, x22
-    b.ge    compact_done
-
-    // Find leftmost free space
-find_left:
-    cmp     x21, x22
-    b.ge    compact_done
-    ldr     w0, [x20, x21, lsl #2]
-    cmn     w0, #1                          // Compare with -1
-    b.eq    find_right                      // Found free space
-    add     x21, x21, #1
-    b       find_left
-
-find_right:
-    // Find rightmost file block
-    cmp     x21, x22
-    b.ge    compact_done
-    ldr     w1, [x20, x22, lsl #2]
-    cmn     w1, #1                          // Compare with -1
-    b.ne    do_swap                         // Found file block
-    sub     x22, x22, #1
-    b       find_right
-
-do_swap:
-    // Swap blocks[left] and blocks[right]
-    str     w1, [x20, x21, lsl #2]          // blocks[left] = blocks[right]
-    mvn     w2, wzr                         // w2 = -1
-    str     w2, [x20, x22, lsl #2]          // blocks[right] = -1
-    add     x21, x21, #1
-    sub     x22, x22, #1
-    b       compact_loop
-
-compact_done:
-    // Calculate checksum
-    bl      calculate_checksum_p1
-
-    ldp     x21, x22, [sp], #16
-    ldp     x19, x20, [sp], #16
-    ldp     x29, x30, [sp], #16
-    ret
-
-// ============================================================================
-// solve_part2: Compact by moving whole files (highest ID first)
-// Returns: checksum in x0
-// ============================================================================
-solve_part2:
-    stp     x29, x30, [sp, #-16]!
-    stp     x19, x20, [sp, #-16]!
-    stp     x21, x22, [sp, #-16]!
-    stp     x23, x24, [sp, #-16]!
-    stp     x25, x26, [sp, #-16]!
-
-    LOAD_ADDR x0, block_count
-    ldr     x19, [x0]                       // x19 = block_count
-    LOAD_ADDR x20, blocks_p2                // x20 = blocks array
-
-    // Find max file ID
-    mov     x21, #0                         // max_file_id
-    mov     x0, #0                          // index
-find_max_id:
-    cmp     x0, x19
-    b.ge    found_max_id
-    ldr     w1, [x20, x0, lsl #2]
-    cmn     w1, #1                          // Skip -1
-    b.eq    1f
-    cmp     x1, x21
-    b.le    1f
-    mov     x21, x1                         // Update max
-1:  add     x0, x0, #1
-    b       find_max_id
-
-found_max_id:
-    // Process files from max_id down to 0
-    mov     x22, x21                        // x22 = current file_id to process
-
-process_file_loop:
-    cmp     x22, #0
-    b.lt    p2_done
-
-    // Find this file's position and length
-    mov     x23, #0                         // search index
-find_file:
-    cmp     x23, x19
-    b.ge    next_file                       // File not found (shouldn't happen)
-    ldr     w0, [x20, x23, lsl #2]
-    sxtw    x0, w0                          // Sign extend for comparison
-    cmp     x0, x22
-    b.eq    found_file_start
-    add     x23, x23, #1
-    b       find_file
-
-found_file_start:
-    // x23 = file start position
-    // Count file length
-    mov     x24, x23                        // x24 = end index
-count_file_len:
-    cmp     x24, x19
-    b.ge    found_file_end
-    ldr     w0, [x20, x24, lsl #2]
-    sxtw    x0, w0
-    cmp     x0, x22
-    b.ne    found_file_end
-    add     x24, x24, #1
-    b       count_file_len
-
-found_file_end:
-    // x23 = file_start, x24 = file_end (exclusive)
-    // x25 = file_length
-    sub     x25, x24, x23
-
-    // Find leftmost free span that fits, before current position
-    mov     x26, #0                         // search position
-find_free_span:
-    cmp     x26, x23                        // Must be left of current position
-    b.ge    next_file                       // No suitable span found
-
-    // Check if current position is free
-    ldr     w0, [x20, x26, lsl #2]
-    cmn     w0, #1
-    b.ne    skip_to_next_free               // Not free, skip ahead
-
-    // Count consecutive free blocks
-    mov     x1, x26                         // span_start
-    mov     x2, #0                          // span_length
-count_free:
-    cmp     x1, x23                         // Don't go past file position
-    b.ge    check_span_fits
-    ldr     w0, [x20, x1, lsl #2]
-    cmn     w0, #1
-    b.ne    check_span_fits                 // End of free span
-    add     x2, x2, #1
-    add     x1, x1, #1
-    b       count_free
-
-check_span_fits:
-    // x2 = span_length, x25 = file_length
-    cmp     x2, x25
-    b.ge    move_file                       // Found suitable span at x26
-
-    // Continue searching
-    mov     x26, x1                         // Jump to end of this free span
-    b       find_free_span
-
-skip_to_next_free:
-    add     x26, x26, #1
-    b       find_free_span
-
-move_file:
-    // Move file from [x23, x24) to [x26, x26+length)
-    // x26 = new_start, x23 = old_start, x24 = old_end
-
-    // Clear old position
-    mov     x0, x23
-clear_old:
-    cmp     x0, x24
-    b.ge    write_new
-    mvn     w1, wzr                         // -1
-    str     w1, [x20, x0, lsl #2]
-    add     x0, x0, #1
-    b       clear_old
-
-write_new:
-    // Write to new position
-    mov     x0, x26
-    mov     x1, #0                          // offset counter
-write_new_loop:
-    cmp     x1, x25
-    b.ge    next_file
-    str     w22, [x20, x0, lsl #2]          // Write file_id
-    add     x0, x0, #1
-    add     x1, x1, #1
-    b       write_new_loop
-
-next_file:
-    sub     x22, x22, #1
-    b       process_file_loop
-
-p2_done:
-    // Calculate checksum
-    bl      calculate_checksum_p2
+    // Save counters
+    sub     x25, x25, #1                    // max_file_id = last file_id
+    LOAD_ADDR x0, max_file_id
+    str     x25, [x0]
+    LOAD_ADDR x0, num_free
+    str     x26, [x0]
+    LOAD_ADDR x0, total_blocks
+    str     x28, [x0]
 
     ldp     x25, x26, [sp], #16
     ldp     x23, x24, [sp], #16
@@ -404,84 +209,318 @@ p2_done:
     ret
 
 // ============================================================================
-// calculate_checksum_p1: Calculate checksum for Part 1
-// Sum of position * file_id for each non-empty block
-// Returns: checksum in x0
+// checksum_span: Calculate checksum contribution for a span
+// Input: x0 = file_id, x1 = position, x2 = length
+// Output: x0 = checksum contribution
+// Formula: file_id * (len * pos + len * (len-1) / 2)
 // ============================================================================
-calculate_checksum_p1:
+checksum_span:
+    // x0 = file_id, x1 = pos, x2 = len
+    // Result = file_id * (len * pos + len * (len-1) / 2)
+
+    mul     x3, x2, x1                      // x3 = len * pos
+    sub     x4, x2, #1                      // x4 = len - 1
+    mul     x4, x2, x4                      // x4 = len * (len-1)
+    lsr     x4, x4, #1                      // x4 = len * (len-1) / 2
+    add     x3, x3, x4                      // x3 = len * pos + len * (len-1) / 2
+    mul     x0, x0, x3                      // x0 = file_id * sum
+    ret
+
+// ============================================================================
+// solve_part1: Block-by-block compaction using span logic
+// ============================================================================
+solve_part1:
     stp     x29, x30, [sp, #-16]!
     stp     x19, x20, [sp, #-16]!
     stp     x21, x22, [sp, #-16]!
+    stp     x23, x24, [sp, #-16]!
+    stp     x25, x26, [sp, #-16]!
+    stp     x27, x28, [sp, #-16]!
 
-    LOAD_ADDR x0, block_count
-    ldr     x19, [x0]                       // x19 = block_count
-    LOAD_ADDR x20, blocks_p1                // x20 = blocks array
+    LOAD_ADDR x19, max_file_id
+    ldr     x19, [x19]                      // x19 = max_file_id
+    LOAD_ADDR x20, total_blocks
+    ldr     x20, [x20]                      // x20 = cutoff (total file blocks)
+    LOAD_ADDR x21, file_pos
+    LOAD_ADDR x22, file_len
+    LOAD_ADDR x23, num_free
+    ldr     x23, [x23]                      // x23 = num_free
+    LOAD_ADDR x24, free_pos
+    LOAD_ADDR x25, free_len
 
-    mov     x21, #0                         // checksum accumulator
-    mov     x22, #0                         // position counter
+    mov     x26, #0                         // part1 checksum
+    mov     x27, #0                         // Current file_id
 
-checksum_loop_p1:
-    cmp     x22, x19
-    b.ge    checksum_done_p1
+    // Process file blocks that stay (files before cutoff)
+stay_loop:
+    cmp     x27, x19
+    b.gt    fill_free_spans
 
-    ldr     w0, [x20, x22, lsl #2]
-    cmn     w0, #1                          // Skip if -1 (free space)
-    b.eq    next_position_p1
+    ldr     x0, [x21, x27, lsl #3]          // file_pos[fid]
+    cmp     x0, x20
+    b.ge    fill_free_spans                 // File entirely after cutoff
 
-    // Add position * file_id to checksum
-    sxtw    x0, w0                          // Sign extend file_id to 64-bit
-    mul     x1, x22, x0                     // position * file_id
-    add     x21, x21, x1
+    ldr     x2, [x22, x27, lsl #3]          // file_len[fid]
+    add     x1, x0, x2                      // end = pos + len
+    cmp     x1, x20
+    b.le    stay_full
 
-next_position_p1:
-    add     x22, x22, #1
-    b       checksum_loop_p1
+    // Partial stay
+    sub     x2, x20, x0                     // stay_len = cutoff - pos
 
-checksum_done_p1:
-    mov     x0, x21                         // Return checksum
+stay_full:
+    // Add checksum for this span
+    mov     x1, x0                          // position
+    mov     x0, x27                         // file_id
+    stp     x19, x20, [sp, #-16]!
+    stp     x21, x22, [sp, #-16]!
+    stp     x23, x24, [sp, #-16]!
+    stp     x25, x26, [sp, #-16]!
+    stp     x27, x28, [sp, #-16]!
+    bl      checksum_span
+    ldp     x27, x28, [sp], #16
+    ldp     x25, x26, [sp], #16
+    ldp     x23, x24, [sp], #16
+    ldp     x21, x22, [sp], #16
+    ldp     x19, x20, [sp], #16
+    add     x26, x26, x0                    // part1 += checksum
 
+    add     x27, x27, #1
+    b       stay_loop
+
+fill_free_spans:
+    // Fill free spans with file blocks from the right
+    mov     x27, x19                        // take_fid = max_file_id
+    mov     x28, #0                         // take_offset (blocks taken from current file)
+    mov     x10, #0                         // free_index (0-based, we use 0 to num_free-1)
+
+free_loop:
+    cmp     x10, x23
+    b.ge    part1_done
+
+    ldr     x11, [x24, x10, lsl #3]         // fpos = free_pos[f]
+    cmp     x11, x20
+    b.ge    part1_done                      // Free span after cutoff
+
+    ldr     x12, [x25, x10, lsl #3]         // flen = free_len[f]
+    add     x13, x11, x12                   // end = fpos + flen
+    cmp     x13, x20
+    b.le    1f
+    sub     x12, x20, x11                   // flen = cutoff - fpos
+
+1:  mov     x14, #0                         // filled = 0
+
+fill_loop:
+    cmp     x14, x12
+    b.ge    next_free
+
+    // Find next file to take from (must be at or after cutoff)
+find_take:
+    cmp     x27, #0
+    b.lt    next_free                       // No more files
+
+    ldr     x15, [x21, x27, lsl #3]         // file_pos[take_fid]
+    cmp     x15, x20
+    b.ge    found_take
+    sub     x27, x27, #1
+    mov     x28, #0
+    b       find_take
+
+found_take:
+    // Calculate available and needed blocks
+    ldr     x15, [x22, x27, lsl #3]         // file_len[take_fid]
+    sub     x15, x15, x28                   // avail = file_len - take_offset
+    sub     x16, x12, x14                   // need = flen - filled
+    cmp     x15, x16
+    csel    x17, x15, x16, lt               // use = min(avail, need)
+
+    // Add checksum for this span at fpos+filled
+    add     x1, x11, x14                    // position = fpos + filled
+    mov     x0, x27                         // file_id = take_fid
+    mov     x2, x17                         // length = use
+
+    stp     x10, x11, [sp, #-16]!
+    stp     x12, x13, [sp, #-16]!
+    stp     x14, x15, [sp, #-16]!
+    stp     x16, x17, [sp, #-16]!
+    stp     x19, x20, [sp, #-16]!
+    stp     x21, x22, [sp, #-16]!
+    stp     x23, x24, [sp, #-16]!
+    stp     x25, x26, [sp, #-16]!
+    stp     x27, x28, [sp, #-16]!
+    bl      checksum_span
+    ldp     x27, x28, [sp], #16
+    ldp     x25, x26, [sp], #16
+    ldp     x23, x24, [sp], #16
+    ldp     x21, x22, [sp], #16
+    ldp     x19, x20, [sp], #16
+    ldp     x16, x17, [sp], #16
+    ldp     x14, x15, [sp], #16
+    ldp     x12, x13, [sp], #16
+    ldp     x10, x11, [sp], #16
+    add     x26, x26, x0                    // part1 += checksum
+
+    add     x14, x14, x17                   // filled += use
+    add     x28, x28, x17                   // take_offset += use
+
+    // Check if we exhausted this file
+    ldr     x15, [x22, x27, lsl #3]
+    cmp     x28, x15
+    b.lt    fill_loop
+    sub     x27, x27, #1
+    mov     x28, #0
+    b       fill_loop
+
+next_free:
+    add     x10, x10, #1
+    b       free_loop
+
+part1_done:
+    mov     x0, x26                         // Return checksum
+
+    ldp     x27, x28, [sp], #16
+    ldp     x25, x26, [sp], #16
+    ldp     x23, x24, [sp], #16
     ldp     x21, x22, [sp], #16
     ldp     x19, x20, [sp], #16
     ldp     x29, x30, [sp], #16
     ret
 
 // ============================================================================
-// calculate_checksum_p2: Calculate checksum for Part 2
-// Sum of position * file_id for each non-empty block
-// Returns: checksum in x0
+// solve_part2: Whole-file compaction
 // ============================================================================
-calculate_checksum_p2:
+solve_part2:
     stp     x29, x30, [sp, #-16]!
     stp     x19, x20, [sp, #-16]!
     stp     x21, x22, [sp, #-16]!
+    stp     x23, x24, [sp, #-16]!
+    stp     x25, x26, [sp, #-16]!
+    stp     x27, x28, [sp, #-16]!
 
-    LOAD_ADDR x0, block_count
-    ldr     x19, [x0]                       // x19 = block_count
-    LOAD_ADDR x20, blocks_p2                // x20 = blocks array
+    LOAD_ADDR x19, max_file_id
+    ldr     x19, [x19]                      // x19 = max_file_id
+    LOAD_ADDR x20, num_free
+    ldr     x20, [x20]                      // x20 = num_free
+    LOAD_ADDR x21, file_pos
+    LOAD_ADDR x22, file_len
+    LOAD_ADDR x23, free_pos
+    LOAD_ADDR x24, free_len
+    LOAD_ADDR x25, p2_file_pos
+    LOAD_ADDR x26, p2_free_pos
+    LOAD_ADDR x27, p2_free_len
 
-    mov     x21, #0                         // checksum accumulator
-    mov     x22, #0                         // position counter
+    // Copy file positions to working array
+    mov     x0, #0
+copy_file_pos:
+    cmp     x0, x19
+    b.gt    copy_free
+    ldr     x1, [x21, x0, lsl #3]
+    str     x1, [x25, x0, lsl #3]
+    add     x0, x0, #1
+    b       copy_file_pos
 
-checksum_loop_p2:
-    cmp     x22, x19
-    b.ge    checksum_done_p2
+copy_free:
+    // Copy free spans to working arrays
+    mov     x0, #0
+copy_free_loop:
+    cmp     x0, x20
+    b.ge    process_files
+    ldr     x1, [x23, x0, lsl #3]
+    str     x1, [x26, x0, lsl #3]           // p2_free_pos[i] = free_pos[i]
+    ldr     x1, [x24, x0, lsl #3]
+    str     x1, [x27, x0, lsl #3]           // p2_free_len[i] = free_len[i]
+    add     x0, x0, #1
+    b       copy_free_loop
 
-    ldr     w0, [x20, x22, lsl #2]
-    cmn     w0, #1                          // Skip if -1 (free space)
-    b.eq    next_position_p2
+process_files:
+    // Process files from max_file_id down to 0
+    mov     x28, x19                        // fid = max_file_id
 
-    // Add position * file_id to checksum
-    sxtw    x0, w0                          // Sign extend file_id to 64-bit
-    mul     x1, x22, x0                     // position * file_id
-    add     x21, x21, x1
+file_loop:
+    cmp     x28, #0
+    b.lt    calc_part2
 
-next_position_p2:
-    add     x22, x22, #1
-    b       checksum_loop_p2
+    ldr     x10, [x22, x28, lsl #3]         // flen = file_len[fid]
+    ldr     x11, [x25, x28, lsl #3]         // fpos = p2_file_pos[fid]
 
-checksum_done_p2:
-    mov     x0, x21                         // Return checksum
+    // Find leftmost free span that fits (must be left of file)
+    mov     x0, #0                          // free index
+    mov     x12, #-1                        // best = -1 (none found)
 
+find_span:
+    cmp     x0, x20
+    b.ge    check_move
+
+    ldr     x1, [x26, x0, lsl #3]           // p2_free_pos[f]
+    cmp     x1, x11
+    b.ge    check_move                      // Only look left
+
+    ldr     x2, [x27, x0, lsl #3]           // p2_free_len[f]
+    cmp     x2, x10
+    b.lt    next_span                       // Doesn't fit
+
+    mov     x12, x0                         // Found suitable span
+    b       check_move
+
+next_span:
+    add     x0, x0, #1
+    b       find_span
+
+check_move:
+    cmp     x12, #0
+    b.lt    next_file                       // No suitable span found
+
+    // Move file to this free span
+    ldr     x1, [x26, x12, lsl #3]          // p2_free_pos[best]
+    str     x1, [x25, x28, lsl #3]          // p2_file_pos[fid] = p2_free_pos[best]
+
+    // Update free span
+    add     x1, x1, x10                     // p2_free_pos[best] += flen
+    str     x1, [x26, x12, lsl #3]
+    ldr     x2, [x27, x12, lsl #3]          // p2_free_len[best]
+    sub     x2, x2, x10                     // p2_free_len[best] -= flen
+    str     x2, [x27, x12, lsl #3]
+next_file:
+    sub     x28, x28, #1
+    b       file_loop
+
+calc_part2:
+    // Calculate checksum
+    mov     x28, #0                         // part2 checksum
+    mov     x10, #0                         // fid
+
+checksum_loop:
+    cmp     x10, x19
+    b.gt    part2_done
+
+    ldr     x1, [x25, x10, lsl #3]          // p2_file_pos[fid]
+    ldr     x2, [x22, x10, lsl #3]          // file_len[fid]
+    mov     x0, x10                         // file_id
+
+    stp     x10, x19, [sp, #-16]!
+    stp     x20, x21, [sp, #-16]!
+    stp     x22, x23, [sp, #-16]!
+    stp     x24, x25, [sp, #-16]!
+    stp     x26, x27, [sp, #-16]!
+    str     x28, [sp, #-16]!
+    bl      checksum_span
+    ldr     x28, [sp], #16
+    ldp     x26, x27, [sp], #16
+    ldp     x24, x25, [sp], #16
+    ldp     x22, x23, [sp], #16
+    ldp     x20, x21, [sp], #16
+    ldp     x10, x19, [sp], #16
+    add     x28, x28, x0                    // part2 += checksum
+
+    add     x10, x10, #1
+    b       checksum_loop
+
+part2_done:
+    mov     x0, x28                         // Return checksum
+
+    ldp     x27, x28, [sp], #16
+    ldp     x25, x26, [sp], #16
+    ldp     x23, x24, [sp], #16
     ldp     x21, x22, [sp], #16
     ldp     x19, x20, [sp], #16
     ldp     x29, x30, [sp], #16
@@ -489,7 +528,6 @@ checksum_done_p2:
 
 // ============================================================================
 // print_str: Print a null-terminated string
-// Input: x0 = address of string
 // ============================================================================
 print_str:
     stp     x29, x30, [sp, #-16]!
@@ -517,7 +555,6 @@ print_str:
 
 // ============================================================================
 // print_num: Print a number
-// Input: x0 = number to print
 // ============================================================================
 print_num:
     stp     x29, x30, [sp, #-16]!

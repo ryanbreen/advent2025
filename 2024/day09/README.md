@@ -73,13 +73,14 @@ For Part 2, the "decreasing file ID order" constraint prevents the problem from 
 ## Language Notes
 
 ### Fast Performers
-- **C, Rust, C++, Zig** (80-150ms): Direct array manipulation with minimal overhead
+- **ARM64 asm** (19ms): Span-based approach with register-rich architecture
+- **C, Rust, C++, Zig** (80-150ms): Block expansion with direct array manipulation
 - **Go** (153ms): Efficient slices, though GC shows in memory
 - **Node.js** (265ms): V8's array optimization works well here
 
 ### Notable Performance Gaps
 - **Python, Ruby, Perl** (8-12 seconds): Interpreted languages struggle with ~95,000 array mutations
-- **Bash** (~9 minutes): Array operations in Bash are extremely slow; each `array[i]=value` spawns operations
+- **Bash** (6 seconds with span optimization, 9 minutes with block expansion): See optimization section below
 
 ### Implementation Considerations
 - **Memory**: The block array is ~95KB for file IDs, but languages with object overhead (Java, Clojure) use significantly more
@@ -102,8 +103,18 @@ The naive Bash implementation that expands to ~95,000 blocks takes **9 minutes**
 
 Result: **6 seconds** instead of 9 minutes.
 
-### ARM64 Assembly
-The assembly implementation is interesting: it can't practically expand to a 95,000-element array with manual memory management in reasonable code size, so it uses a different approach - direct calculation without full expansion where possible.
+### ARM64 Assembly - Span-Based (15x Speedup, Fastest Overall)
+The original ARM64 implementation used block expansion like C, resulting in 290ms. By adopting the span-based approach:
+
+- **Before**: 290ms (block expansion, ~760KB memory for two arrays)
+- **After**: 19ms (span-based, ~240KB for span metadata)
+- **Result**: 4x faster than C, fastest implementation overall
+
+ARM64 excels here because:
+- 31 general-purpose registers keep span metadata in registers
+- Single-instruction array indexing: `ldr x0, [x21, x27, lsl #3]`
+- All span data fits in L1 cache (no cache misses)
+- No function call overhead (inlined critical paths)
 
 ## Answers
 
