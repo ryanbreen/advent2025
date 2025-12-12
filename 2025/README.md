@@ -17,6 +17,7 @@ Solutions implemented in 16 languages.
 | 9   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 10  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 11  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
+| 12  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 
 ## Benchmarks
 
@@ -253,3 +254,24 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Ruby        | 124.39       | 28.19       |
 | Clojure     | 413.22       | 131.09      |
 | ColdFusion  | 2,700.00     | 1,140.00    |
+
+### Day 12: Christmas Tree Farm
+
+| Language    | Runtime (ms) | Memory (MB) |
+|-------------|--------------|-------------|
+| Rust        | 5.58         | 1.89        |
+| ARM64 asm   | 5.61         | 1.89        |
+| Zig         | 5.77         | 1.89        |
+| C           | 6.06         | 1.67        |
+| C++         | 7.77         | 1.97        |
+| Perl        | 11.76        | 5.69        |
+| Common Lisp | 26.44        | 42.75       |
+| Python      | 27.43        | 15.09       |
+| Node.js     | 47.56        | 44.17       |
+| Go          | 50.89        | 27.14       |
+| PHP         | 51.13        | 25.30       |
+| Java        | 56.61        | 53.28       |
+| Ruby        | 62.60        | 28.36       |
+| Bash        | 117.09       | 6.62        |
+| Clojure     | 412.89       | 133.34      |
+| ColdFusion  | 2,514.18     | 1,195.98    |
