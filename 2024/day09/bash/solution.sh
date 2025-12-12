@@ -1,169 +1,152 @@
-#!/usr/bin/env bash
+#!/bin/bash
+# Day 9: Disk Fragmenter - Span-based approach (no block expansion)
 #
-# Advent of Code 2024 Day 9: Disk Fragmenter
+# Key insight: Work with spans (file_id, position, length) instead of
+# expanding to individual blocks. Calculate checksums mathematically.
 #
-# Compact a fragmented disk by moving file blocks to fill gaps.
-# Part 1: Move blocks one at a time from end to leftmost free space
-# Part 2: Move whole files to leftmost span that fits
+# Checksum contribution for file f at position p with length len:
+#   f * (p + p+1 + ... + p+len-1) = f * len * p + f * len * (len-1) / 2
 
-set -euo pipefail
-
-# Parse disk map into expanded block representation
-# Creates array 'blocks' where each element is file ID or -1 for free space
-parse_disk_map() {
-    local disk_map="$1"
-    blocks=()
-    local file_id=0
-    local is_file=1
-    local i
-
-    for (( i=0; i<${#disk_map}; i++ )); do
-        local digit="${disk_map:$i:1}"
-        local length="$digit"
-
-        if (( is_file )); then
-            for (( j=0; j<length; j++ )); do
-                blocks+=("$file_id")
-            done
-            (( file_id++ ))
-        else
-            for (( j=0; j<length; j++ )); do
-                blocks+=("-1")
-            done
-        fi
-        (( is_file = 1 - is_file ))
-    done
+awk '
+function checksum_span(file_id, pos, len) {
+    return file_id * (len * pos + len * (len - 1) / 2)
 }
 
-# Compact disk by moving blocks one at a time from end to leftmost free space
-compact_blocks() {
-    local left=0
-    local right=$(( ${#blocks[@]} - 1 ))
+{
+    # Parse disk map into file and free span arrays
+    n = split($0, chars, "")
 
-    while (( left < right )); do
-        # Find leftmost free space
-        while (( left < right && blocks[left] != -1 )); do
-            (( left++ ))
-        done
+    num_files = 0
+    num_free = 0
+    pos = 0
+    file_id = 0
+    is_file = 1
+    total_file_blocks = 0
 
-        # Find rightmost file block
-        while (( left < right && blocks[right] == -1 )); do
-            (( right-- ))
-        done
+    for (i = 1; i <= n; i++) {
+        len = int(chars[i])
+        if (is_file) {
+            if (len > 0) {
+                num_files++
+                file_pos[file_id] = pos
+                file_len[file_id] = len
+                total_file_blocks += len
+            }
+            file_id++
+        } else {
+            if (len > 0) {
+                num_free++
+                free_pos[num_free] = pos
+                free_len[num_free] = len
+            }
+        }
+        pos += len
+        is_file = 1 - is_file
+    }
 
-        if (( left < right )); then
-            # Swap
-            blocks[left]="${blocks[right]}"
-            blocks[right]=-1
-            (( left++ ))
-            (( right-- ))
-        fi
-    done
+    max_file_id = file_id - 1
+
+    # Part 1: Block-by-block compaction
+    # After compaction, positions 0 to total_file_blocks-1 contain all file blocks
+    # We simulate filling free spans with blocks taken from files on the right
+
+    part1 = 0
+    cutoff = total_file_blocks
+
+    # Process file blocks that stay (files entirely or partially before cutoff)
+    for (fid = 0; fid <= max_file_id; fid++) {
+        if (file_pos[fid] >= cutoff) break
+        stay_len = file_len[fid]
+        if (file_pos[fid] + stay_len > cutoff) {
+            stay_len = cutoff - file_pos[fid]
+        }
+        part1 += checksum_span(fid, file_pos[fid], stay_len)
+    }
+
+    # Now fill free spans (before cutoff) with file blocks from the right
+    take_fid = max_file_id
+    take_offset = 0  # Blocks already taken from current file
+
+    for (f = 1; f <= num_free; f++) {
+        fpos = free_pos[f]
+        if (fpos >= cutoff) break
+
+        flen = free_len[f]
+        if (fpos + flen > cutoff) {
+            flen = cutoff - fpos
+        }
+
+        filled = 0
+        while (filled < flen) {
+            # Find next file to take from (must be at or after cutoff)
+            while (take_fid >= 0 && file_pos[take_fid] < cutoff) {
+                take_fid--
+                take_offset = 0
+            }
+            if (take_fid < 0) break
+
+            # How many blocks remain in this file?
+            # We need blocks from the END of the file (rightmost blocks move first)
+            avail = file_len[take_fid] - take_offset
+            need = flen - filled
+            use = (avail < need) ? avail : need
+
+            # These blocks go to positions fpos+filled to fpos+filled+use-1
+            part1 += checksum_span(take_fid, fpos + filled, use)
+
+            filled += use
+            take_offset += use
+            if (take_offset >= file_len[take_fid]) {
+                take_fid--
+                take_offset = 0
+            }
+        }
+    }
+
+    print "Part 1:", part1
+
+    # Part 2: Whole-file compaction
+    # Make working copies of file positions
+    for (fid = 0; fid <= max_file_id; fid++) {
+        p2_file_pos[fid] = file_pos[fid]
+    }
+    # Make working copy of free spans
+    for (f = 1; f <= num_free; f++) {
+        p2_free_pos[f] = free_pos[f]
+        p2_free_len[f] = free_len[f]
+    }
+
+    # Process files from highest ID to lowest
+    for (fid = max_file_id; fid >= 0; fid--) {
+        flen = file_len[fid]
+        fpos = p2_file_pos[fid]
+
+        # Find leftmost free span that fits (must be to the left of file)
+        best = 0
+        for (f = 1; f <= num_free; f++) {
+            if (p2_free_pos[f] >= fpos) break  # Only look left
+            if (p2_free_len[f] >= flen) {
+                best = f
+                break
+            }
+        }
+
+        if (best > 0) {
+            # Move file to this free span
+            p2_file_pos[fid] = p2_free_pos[best]
+
+            # Shrink or consume the free span
+            p2_free_pos[best] += flen
+            p2_free_len[best] -= flen
+        }
+    }
+
+    # Calculate part 2 checksum
+    part2 = 0
+    for (fid = 0; fid <= max_file_id; fid++) {
+        part2 += checksum_span(fid, p2_file_pos[fid], file_len[fid])
+    }
+
+    print "Part 2:", part2
 }
-
-# Calculate filesystem checksum: sum of position * file_id for each block
-calculate_checksum() {
-    local checksum=0
-    local pos
-
-    for pos in "${!blocks[@]}"; do
-        local file_id="${blocks[pos]}"
-        if (( file_id != -1 )); then
-            (( checksum += pos * file_id ))
-        fi
-    done
-
-    echo "$checksum"
-}
-
-# Part 1: Compact by moving individual blocks, return checksum
-part1() {
-    local disk_map
-    disk_map=$(cat ../input.txt)
-
-    parse_disk_map "$disk_map"
-    compact_blocks
-    calculate_checksum
-}
-
-# Part 2: Compact by moving whole files (highest ID first), return checksum
-part2() {
-    local disk_map
-    disk_map=$(cat ../input.txt)
-
-    parse_disk_map "$disk_map"
-
-    # Find all files: file_id -> "start,length"
-    declare -A files
-    local i=0
-    local max_file_id=0
-
-    while (( i < ${#blocks[@]} )); do
-        if (( blocks[i] != -1 )); then
-            local file_id="${blocks[i]}"
-            local start=$i
-            while (( i < ${#blocks[@]} && blocks[i] == file_id )); do
-                (( i++ ))
-            done
-            local length=$(( i - start ))
-            files[$file_id]="$start,$length"
-            if (( file_id > max_file_id )); then
-                max_file_id=$file_id
-            fi
-        else
-            (( i++ ))
-        fi
-    done
-
-    # Process files in decreasing order of file ID
-    for (( file_id=max_file_id; file_id>=0; file_id-- )); do
-        if [[ -z "${files[$file_id]:-}" ]]; then
-            continue
-        fi
-
-        IFS=',' read -r start length <<< "${files[$file_id]}"
-
-        # Find leftmost span of free space that fits this file
-        # Must be to the left of current position
-        local free_start=-1
-        i=0
-
-        while (( i < start )); do
-            if (( blocks[i] == -1 )); then
-                # Count consecutive free blocks
-                local span_start=$i
-                local span_length=0
-                while (( i < start && blocks[i] == -1 )); do
-                    (( span_length++ ))
-                    (( i++ ))
-                done
-                if (( span_length >= length )); then
-                    free_start=$span_start
-                    break
-                fi
-            else
-                (( i++ ))
-            fi
-        done
-
-        # Move file if we found a suitable span
-        if (( free_start != -1 )); then
-            # Clear old position
-            for (( j=start; j<start+length; j++ )); do
-                blocks[j]=-1
-            done
-            # Write to new position
-            for (( j=free_start; j<free_start+length; j++ )); do
-                blocks[j]=$file_id
-            done
-            # Update file position
-            files[$file_id]="$free_start,$length"
-        fi
-    done
-
-    calculate_checksum
-}
-
-# Main
-echo "Part 1: $(part1)"
-echo "Part 2: $(part2)"
+' ../input.txt

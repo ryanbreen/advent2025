@@ -211,7 +211,5 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Ruby        | 7,701        | 31.1        |
 | Python      | 8,520        | 17.6        |
 | Perl        | 11,681       | 21.8        |
+| Bash        | 5,886        | 9.6         |
 | ColdFusion  | 23,913       | 1,488       |
-| Bash        | 531,339*     | 19.6        |
-
-*Bash takes ~8.9 minutes due to slow array operations on ~95,000 blocks

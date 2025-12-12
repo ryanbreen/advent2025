@@ -89,6 +89,19 @@ For Part 2, the "decreasing file ID order" constraint prevents the problem from 
   - Bash: Native arithmetic handles it
   - PHP: Works on 64-bit systems
 
+### Bash - Span-Based Optimization (90x Speedup)
+The naive Bash implementation that expands to ~95,000 blocks takes **9 minutes** due to slow array operations. The optimized version works with **spans** instead:
+
+1. **No block expansion**: Keep the compressed representation (~10,000 spans vs ~95,000 blocks)
+2. **Mathematical checksum**: For a file at position `p` with length `L` and ID `f`:
+   ```
+   contribution = f × (p + p+1 + ... + p+L-1)
+                = f × L × p + f × L × (L-1) / 2
+   ```
+3. **AWK for heavy lifting**: AWK's associative arrays are orders of magnitude faster than Bash's
+
+Result: **6 seconds** instead of 9 minutes.
+
 ### ARM64 Assembly
 The assembly implementation is interesting: it can't practically expand to a 95,000-element array with manual memory management in reasonable code size, so it uses a different approach - direct calculation without full expansion where possible.
 
