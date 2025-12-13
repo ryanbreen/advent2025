@@ -17,6 +17,8 @@ Solutions implemented in 16 languages.
 | 9   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 10  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 11  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
+| 12  | ⭐⭐   | Zig (in progress) |
+| 13  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 
 ## Benchmarks
 
@@ -259,3 +261,32 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Clojure     | 768.5        | 208.4       |
 | ColdFusion  | 4,830.4      | 991.4       |
 | Bash        | 12,062.0     | 14.1        |
+
+### Day 12: Garden Groups
+
+| Language    | Runtime (ms) | Memory (MB) |
+|-------------|--------------|-------------|
+| Zig         | 16.2         | 4.5         |
+
+### Day 13: Claw Contraption
+
+*Happy Birthday Taylor Swift!* 🎂
+
+| Language    | Runtime (ms) | Memory (MB) |
+|-------------|--------------|-------------|
+| C           | 6.0          | 1.9         |
+| ARM64 asm   | 6.5          | 1.9         |
+| Zig         | 6.6          | 1.9         |
+| Rust        | 7.2          | 1.9         |
+| Go          | 8.6          | 4.7         |
+| C++         | 8.9          | 1.9         |
+| Perl        | 10.7         | 4.6         |
+| Common Lisp | 27.4         | 41.2        |
+| Python      | 32.1         | 15.8        |
+| Node.js     | 46.5         | 40.9        |
+| PHP         | 62.2         | 24.8        |
+| Java        | 62.9         | 49.6        |
+| Ruby        | 67.1         | 28.4        |
+| Clojure     | 505.8        | 133.8       |
+| ColdFusion  | 2,818.2      | 1,126.3     |
+| Bash        | 15,335.6     | 6.6         |
