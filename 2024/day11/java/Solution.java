@@ -1,12 +1,14 @@
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
 public class Solution {
-    // Memoization cache: key is "value,blinks"
-    private static Map<String, Long> memo = new HashMap<>();
+    // Memoization cache: bit-packed key (value << 8) | blinks
+    // blinks max is 75, fits in 7 bits
+    private static Map<Long, Long> memo = new HashMap<>();
 
     /**
      * Count how many stones result from a single stone after N blinks.
@@ -17,14 +19,14 @@ public class Solution {
             return 1;
         }
 
-        // Check memo cache
-        String key = value + "," + blinks;
-        if (memo.containsKey(key)) {
-            return memo.get(key);
+        // Bit-pack key: (value << 8) | blinks
+        long key = (value << 8) | blinks;
+        Long cached = memo.get(key);
+        if (cached != null) {
+            return cached;
         }
 
         long result;
-
         // Rule 1: 0 becomes 1
         if (value == 0) {
             result = countStones(1, blinks - 1);
@@ -49,19 +51,15 @@ public class Solution {
     }
 
     private static long part1(long[] stones) {
-        long total = 0;
-        for (long stone : stones) {
-            total += countStones(stone, 25);
-        }
-        return total;
+        return Arrays.stream(stones)
+                .map(stone -> countStones(stone, 25))
+                .sum();
     }
 
     private static long part2(long[] stones) {
-        long total = 0;
-        for (long stone : stones) {
-            total += countStones(stone, 75);
-        }
-        return total;
+        return Arrays.stream(stones)
+                .map(stone -> countStones(stone, 75))
+                .sum();
     }
 
     public static void main(String[] args) throws IOException {
@@ -76,10 +74,6 @@ public class Solution {
         }
 
         System.out.println("Part 1: " + part1(stones));
-
-        // Clear memo between parts to save memory (optional)
-        memo.clear();
-
         System.out.println("Part 2: " + part2(stones));
     }
 }

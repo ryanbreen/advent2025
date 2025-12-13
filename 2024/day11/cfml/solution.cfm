@@ -19,69 +19,67 @@ function countStones(required numeric value, required numeric blinks) {
     }
 
     // Check cache
-    var cacheKey = arguments.value & "," & arguments.blinks;
-    if (structKeyExists(cache, cacheKey)) {
-        return cache[cacheKey];
+    local.cacheKey = arguments.value & "," & arguments.blinks;
+    if (structKeyExists(cache, local.cacheKey)) {
+        return cache[local.cacheKey];
     }
 
-    var result = 0;
+    local.result = 0;
 
     // Rule 1: 0 becomes 1
     if (arguments.value == 0) {
-        result = countStones(1, arguments.blinks - 1);
+        local.result = countStones(1, arguments.blinks - 1);
     }
     // Rule 2: Even number of digits -> split
     else {
-        var valueStr = toString(arguments.value);
-        var digitCount = len(valueStr);
+        local.valueStr = toString(arguments.value);
+        local.digitCount = len(local.valueStr);
 
-        if (digitCount % 2 == 0) {
-            var mid = digitCount / 2;
-            var leftStr = left(valueStr, mid);
-            var rightStr = right(valueStr, mid);
+        if (local.digitCount % 2 == 0) {
+            local.mid = local.digitCount / 2;
+            local.leftStr = left(local.valueStr, local.mid);
+            local.rightStr = right(local.valueStr, local.mid);
 
             // Convert to numbers (this removes leading zeros)
-            var leftNum = val(leftStr);
-            var rightNum = val(rightStr);
+            local.leftNum = int(local.leftStr);
+            local.rightNum = int(local.rightStr);
 
-            result = countStones(leftNum, arguments.blinks - 1) + countStones(rightNum, arguments.blinks - 1);
+            local.result = countStones(local.leftNum, arguments.blinks - 1) + countStones(local.rightNum, arguments.blinks - 1);
         }
         // Rule 3: Multiply by 2024
         else {
-            // Use precisionEvaluate for big number math
-            var newValue = precisionEvaluate(arguments.value * 2024);
-            result = countStones(newValue, arguments.blinks - 1);
+            local.newValue = arguments.value * 2024;
+            local.result = countStones(local.newValue, arguments.blinks - 1);
         }
     }
 
     // Cache the result
-    cache[cacheKey] = result;
+    cache[local.cacheKey] = local.result;
 
-    return result;
+    return local.result;
 }
 
 function part1() {
-    var total = 0;
-    for (var stone in stones) {
-        var stoneNum = val(stone);
-        total += countStones(stoneNum, 25);
+    local.total = 0;
+    for (local.stone in stones) {
+        local.stoneNum = int(local.stone);
+        local.total += countStones(local.stoneNum, 25);
     }
-    return total;
+    return local.total;
 }
 
 function part2() {
-    // Clear cache between parts
-    cache = {};
-
-    var total = 0;
-    for (var stone in stones) {
-        var stoneNum = val(stone);
-        total += countStones(stoneNum, 75);
+    local.total = 0;
+    for (local.stone in stones) {
+        local.stoneNum = int(local.stone);
+        local.total += countStones(local.stoneNum, 75);
     }
-    return total;
+    return local.total;
 }
 
 // Run both parts
-writeOutput("Part 1: " & part1() & chr(10));
-writeOutput("Part 2: " & part2() & chr(10));
+writeOutput("Part 1: " & part1() & "
+");
+writeOutput("Part 2: " & part2() & "
+");
 </cfscript>

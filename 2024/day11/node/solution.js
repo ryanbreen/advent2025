@@ -5,8 +5,8 @@ import { dirname, join } from 'path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const input = readFileSync(join(__dirname, '..', 'input.txt'), 'utf-8').trim();
 
-// Parse input - space-separated numbers
-const stones = input.split(' ').map(Number);
+// Parse input - space-separated numbers as BigInt
+const stones = input.split(' ').map(BigInt);
 
 // Memoization cache: "value,blinks" -> count
 const cache = new Map();
@@ -44,20 +44,18 @@ function countStones(value, blinks) {
 
 // Part 1
 function part1() {
-  cache.clear();
   let total = 0n;
   for (const stone of stones) {
-    total += countStones(BigInt(stone), 25);
+    total += countStones(stone, 25);
   }
   return total;
 }
 
 // Part 2
 function part2() {
-  cache.clear();
   let total = 0n;
   for (const stone of stones) {
-    total += countStones(BigInt(stone), 75);
+    total += countStones(stone, 75);
   }
   return total;
 }

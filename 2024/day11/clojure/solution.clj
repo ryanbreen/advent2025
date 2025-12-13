@@ -22,18 +22,17 @@
          (count-stones 1 (dec blinks))
 
          ;; Rule 2: Even number of digits -> split
-         (let [s (str value)]
-           (even? (count s)))
-         (let [s (str value)
-               mid (quot (count s) 2)
-               left (Long/parseLong (subs s 0 mid))
-               right (Long/parseLong (subs s mid))]
-           (+ (count-stones left (dec blinks))
-              (count-stones right (dec blinks))))
-
-         ;; Rule 3: Multiply by 2024
          :else
-         (count-stones (* value 2024) (dec blinks)))))))
+         (let [s (str value)
+               digit-count (count s)]
+           (if (even? digit-count)
+             (let [mid (quot digit-count 2)
+                   left (Long/parseLong (subs s 0 mid))
+                   right (Long/parseLong (subs s mid))]
+               (+ (count-stones left (dec blinks))
+                  (count-stones right (dec blinks))))
+             ;; Rule 3: Multiply by 2024
+             (count-stones (* value 2024) (dec blinks)))))))))
 
 (defn part1 []
   (reduce + (map #(count-stones % 25) stones)))
@@ -41,5 +40,9 @@
 (defn part2 []
   (reduce + (map #(count-stones % 75) stones)))
 
-(println "Part 1:" (part1))
-(println "Part 2:" (part2))
+(defn -main [& args]
+  (println "Part 1:" (part1))
+  (println "Part 2:" (part2)))
+
+;; Run when script is executed
+(-main)

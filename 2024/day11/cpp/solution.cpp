@@ -3,13 +3,19 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <map>
+#include <unordered_map>
 #include <cmath>
 
-using namespace std;
+// Hash function for pair<long long, int> to use with unordered_map
+struct PairHash {
+    std::size_t operator()(const std::pair<long long, int>& p) const {
+        // Combine hashes using a simple but effective method
+        return std::hash<long long>()(p.first) ^ (std::hash<int>()(p.second) << 1);
+    }
+};
 
 // Memoization cache: (value, blinks) -> count
-map<pair<long long, int>, long long> memo;
+std::unordered_map<std::pair<long long, int>, long long, PairHash> memo;
 
 // Count digits in a number
 int count_digits(long long n) {
@@ -23,7 +29,7 @@ int count_digits(long long n) {
 }
 
 // Split a number with even digits into left and right halves
-pair<long long, long long> split_number(long long value, int num_digits) {
+std::pair<long long, long long> split_number(long long value, int num_digits) {
     int mid = num_digits / 2;
     long long divisor = 1;
     for (int i = 0; i < mid; i++) {
@@ -41,10 +47,10 @@ long long count_stones(long long value, int blinks) {
         return 1;
     }
 
-    // Check memoization cache
-    auto key = make_pair(value, blinks);
-    if (memo.find(key) != memo.end()) {
-        return memo[key];
+    // Check memoization cache using structured binding
+    auto key = std::make_pair(value, blinks);
+    if (auto it = memo.find(key); it != memo.end()) {
+        return it->second;
     }
 
     long long result;
@@ -71,7 +77,7 @@ long long count_stones(long long value, int blinks) {
     return result;
 }
 
-long long part1(const vector<long long>& stones) {
+long long part1(const std::vector<long long>& stones) {
     long long total = 0;
     for (long long stone : stones) {
         total += count_stones(stone, 25);
@@ -79,7 +85,7 @@ long long part1(const vector<long long>& stones) {
     return total;
 }
 
-long long part2(const vector<long long>& stones) {
+long long part2(const std::vector<long long>& stones) {
     long long total = 0;
     for (long long stone : stones) {
         total += count_stones(stone, 75);
@@ -89,31 +95,31 @@ long long part2(const vector<long long>& stones) {
 
 int main() {
     // Read input file
-    ifstream infile("../input.txt");
+    std::ifstream infile("../input.txt");
     if (!infile) {
-        cerr << "Error: Could not open input.txt" << endl;
+        std::cerr << "Error: Could not open input.txt" << std::endl;
         return 1;
     }
 
-    string line;
-    getline(infile, line);
+    std::string line;
+    std::getline(infile, line);
     infile.close();
 
     // Parse space-separated numbers
-    vector<long long> stones;
-    stringstream ss(line);
+    std::vector<long long> stones;
+    std::stringstream ss(line);
     long long num;
     while (ss >> num) {
         stones.push_back(num);
     }
 
     // Solve both parts
-    cout << "Part 1: " << part1(stones) << endl;
+    std::cout << "Part 1: " << part1(stones) << std::endl;
 
     // Clear memo between parts to avoid any issues
     // (though it shouldn't matter since we're using different blink counts)
 
-    cout << "Part 2: " << part2(stones) << endl;
+    std::cout << "Part 2: " << part2(stones) << std::endl;
 
     return 0;
 }

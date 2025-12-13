@@ -184,6 +184,7 @@ Solutions should be run from their respective directories with the input file at
 7. Dispatch agents to implement remaining 14 languages in parallel
 8. Run benchmarks and update year README.md
 9. **Generate Day README** with algorithmic analysis (see Day README below)
+10. **VALIDATE IMPLEMENTATIONS** - Run `/validate-implementation` to ensure code quality (see Implementation Validation below)
 
 ## IMPORTANT: Day README - Algorithmic Analysis
 
@@ -256,6 +257,56 @@ Every day's directory **MUST** contain a `README.md` with a human-readable analy
 ```
 
 This README should be written by an Opus agent as part of the finalization phase, after all implementations are complete.
+
+## IMPORTANT: Implementation Validation
+
+After all 16 language implementations are complete, **every implementation must be validated** for quality. Use the `/validate-implementation <year> <day>` slash command.
+
+### Validation Criteria
+
+Each implementation is scored 1-10 on three vectors:
+
+1. **Algorithmic Purity**
+   - Does the code cleanly express the core algorithm?
+   - Is logic separated from I/O and boilerplate?
+   - Are there unnecessary complications or over-engineering?
+   - Does it avoid language-specific hacks that obscure the algorithm?
+
+2. **Idiomatic Quality**
+   - Does it use the language's standard patterns and conventions?
+   - Does it leverage language-specific features appropriately?
+   - Does it follow community best practices?
+   - Does it use the standard library effectively?
+
+3. **Stylistic Quality**
+   - Would a skilled practitioner feel "at home" reading this code?
+   - Is formatting consistent with community standards?
+   - Are names clear and following language conventions?
+   - Is it the kind of code you'd see in a well-maintained open source project?
+
+### Validation Process
+
+**Phase 1: Analysis**
+- Dispatch parallel agents (one per language) to analyze each implementation
+- Each agent scores all three vectors with specific justifications
+- Identify any implementations scoring below 10/10
+
+**Phase 2: Tuning**
+- For implementations below 10/10, dispatch agents to improve the code
+- Improvements must maintain correctness (output must match)
+- Re-benchmark if changes might affect performance
+
+**Phase 3: Verification**
+- Verify all implementations still produce correct output
+- Update benchmarks if performance changed
+- Commit improvements
+
+### Target Quality
+
+All implementations should achieve **10/10 on all three vectors**. The goal is code that:
+- A skilled practitioner in that language would be proud to write
+- Serves as an excellent example of solving the problem in that language
+- Could be used as teaching material for the language
 
 ## IMPORTANT: Answer Submission
 
