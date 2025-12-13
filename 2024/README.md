@@ -19,6 +19,7 @@ Solutions implemented in 16 languages.
 | 11  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 12  | ⭐⭐   | Zig (in progress) |
 | 13  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
+| 14  | ⭐⭐   | C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 
 ## Benchmarks
 
@@ -290,3 +291,23 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Clojure     | 505.8        | 133.8       |
 | ColdFusion  | 2,818.2      | 1,126.3     |
 | Bash        | 15,335.6     | 6.6         |
+
+### Day 14: Restroom Redoubt
+
+| Language    | Runtime (ms) | Memory (MB) |
+|-------------|--------------|-------------|
+| C           | 149          | 47.8        |
+| Go          | 818          | 26.8        |
+| Rust        | 894          | 117.3       |
+| Java        | 1,239        | 1,250.8     |
+| Zig         | 1,357        | 1.5         |
+| Common Lisp | 1,725        | 91.1        |
+| C++         | 2,535        | 166.6       |
+| PHP         | 3,906        | 25.0        |
+| Python      | 3,907        | 15.9        |
+| Node.js     | 4,441        | 62.9        |
+| Clojure     | 4,944        | 1,307.3     |
+| Perl        | 8,251        | 5.0         |
+| ColdFusion  | 18,715       | 1,007.8     |
+| Ruby        | 35,203       | 28.7        |
+| Bash        | 153,877      | 2.5         |
