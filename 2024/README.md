@@ -17,9 +17,9 @@ Solutions implemented in 16 languages.
 | 9   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 10  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 11  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
-| 12  | ⭐⭐   | Zig (in progress) |
+| 12  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 13  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
-| 14  | ⭐⭐   | C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
+| 14  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 
 ## Benchmarks
 
@@ -267,7 +267,22 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 
 | Language    | Runtime (ms) | Memory (MB) |
 |-------------|--------------|-------------|
+| Rust        | 16.3         | 3.1         |
 | Zig         | 16.2         | 4.5         |
+| C           | 17.5         | 1.9         |
+| Go          | 19.4         | 9.9         |
+| ARM64 asm   | 25.9         | 1.9         |
+| C++         | 36.5         | 3.5         |
+| Python      | 76.0         | 20.8        |
+| Java        | 85.1         | 74.4        |
+| Common Lisp | 108.2        | 59.8        |
+| Node.js     | 114.0        | 67.2        |
+| PHP         | 121.7        | 30.3        |
+| Perl        | 150.0        | 10.1        |
+| Ruby        | 386.4        | 35.3        |
+| Clojure     | 626.1        | 216.5       |
+| ColdFusion  | 3,313.3      | 1,089.9     |
+| Bash        | 7,221.7      | 6.8         |
 
 ### Day 13: Claw Contraption
 
@@ -297,6 +312,7 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Language    | Runtime (ms) | Memory (MB) |
 |-------------|--------------|-------------|
 | C           | 149          | 47.8        |
+| ARM64 asm   | 167          | 1.9         |
 | Go          | 818          | 26.8        |
 | Rust        | 894          | 117.3       |
 | Java        | 1,239        | 1,250.8     |

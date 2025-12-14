@@ -71,6 +71,27 @@ Find the first second where robots form a recognizable Christmas tree pattern.
 - **Clojure**: Functional approach with `reduce` over time steps
 - **Common Lisp**: `mod` function naturally handles negative numbers correctly
 
+## Benchmarks
+
+| Language    | Runtime (ms) | Memory (MB) |
+|-------------|--------------|-------------|
+| C           | 149          | 47.8        |
+| ARM64 asm   | 167          | 1.9         |
+| Go          | 818          | 26.8        |
+| Rust        | 894          | 117.3       |
+| Java        | 1,239        | 1,250.8     |
+| Zig         | 1,357        | 1.5         |
+| Common Lisp | 1,725        | 91.1        |
+| C++         | 2,535        | 166.6       |
+| PHP         | 3,906        | 25.0        |
+| Python      | 3,907        | 15.9        |
+| Node.js     | 4,441        | 62.9        |
+| Clojure     | 4,944        | 1,307.3     |
+| Perl        | 8,251        | 5.0         |
+| ColdFusion  | 18,715       | 1,007.8     |
+| Ruby        | 35,203       | 28.7        |
+| Bash        | 153,877      | 2.5         |
+
 ## Answers
 
 - **Part 1**: 232589280

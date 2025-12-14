@@ -10,7 +10,6 @@ filename:   .asciz "../input.txt"
 read_mode:  .asciz "r"
 format_p1:  .asciz "Part 1: %lld\n"
 format_p2:  .asciz "Part 2: %lld\n"
-debug_fmt:  .asciz "q: %lld %lld %lld %lld\n"
 
 .bss
 .align 8
@@ -91,6 +90,10 @@ parse_loop:
     mov     x0, x19
     bl      skip_to_number
     mov     x19, x0
+
+    // Check if skip_to_number hit null (end of input)
+    ldrb    w0, [x19]
+    cbz     w0, parse_done
 
     mov     x0, x19
     bl      parse_signed_int
