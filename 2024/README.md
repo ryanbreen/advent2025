@@ -21,6 +21,8 @@ Solutions implemented in 16 languages.
 | 13  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 14  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 15  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
+| 16  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
+| 17  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 
 ## Benchmarks
 
@@ -349,3 +351,45 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Clojure     | 523.4        | 190.9       |
 | ColdFusion  | 2,945.5      | 1,072.9     |
 | Bash        | >300,000     | TBD         |
+
+### Day 16: Reindeer Maze
+
+| Language    | Runtime (ms) | Memory (MB) |
+|-------------|--------------|-------------|
+| Rust        | 5.5          | 1.9         |
+| Zig         | 5.6          | 1.9         |
+| C           | 11.8         | 3.2         |
+| ARM64 asm   | 13.0         | 2.3         |
+| Go          | 63.6         | 13.2        |
+| C++         | 131.0        | 5.9         |
+| Common Lisp | 172.8        | 73.0        |
+| Node.js     | 178.7        | 77.8        |
+| Java        | 184.0        | 99.5        |
+| Python      | 224.5        | 30.5        |
+| PHP         | 236.5        | 33.2        |
+| Ruby        | 661.7        | 41.0        |
+| Clojure     | 1,002.2      | 669.3       |
+| ColdFusion  | 6,314.4      | 1,065.5     |
+| Perl        | 8,350.5      | 14.4        |
+| Bash        | >300,000     | TBD         |
+
+### Day 17: Chronospatial Computer
+
+| Language    | Runtime (ms) | Memory (MB) |
+|-------------|--------------|-------------|
+| Zig         | 5.1          | 1.9         |
+| Go          | 5.2          | 1.9         |
+| Rust        | 5.6          | 1.9         |
+| C++         | 7.1          | 1.9         |
+| ARM64 asm   | 7.2          | 1.9         |
+| C           | 7.6          | 1.9         |
+| Perl        | 27.9         | 6.8         |
+| Common Lisp | 31.4         | 43.3        |
+| Python      | 33.4         | 15.8        |
+| Node.js     | 52.0         | 45.7        |
+| Java        | 54.0         | 46.3        |
+| PHP         | 75.3         | 24.7        |
+| Ruby        | 93.7         | 28.3        |
+| Bash        | 252.7        | 6.7         |
+| Clojure     | 465.1        | 133.1       |
+| ColdFusion  | 3,104.1      | 1,110.6     |
