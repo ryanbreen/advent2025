@@ -7,56 +7,45 @@ import (
 	"strings"
 )
 
-var patterns []string
-
-func countWays(design string) int64 {
+// countWays returns the number of ways to construct design from patterns.
+// Uses bottom-up dynamic programming with a slice for O(1) memo access.
+func countWays(design string, patterns []string) int64 {
 	n := len(design)
-	memo := make(map[int]int64)
+	dp := make([]int64, n+1)
+	dp[n] = 1 // Base case: empty suffix has one way
 
-	var dp func(pos int) int64
-	dp = func(pos int) int64 {
-		if pos == n {
-			return 1
-		}
-		if val, ok := memo[pos]; ok {
-			return val
-		}
-
-		var total int64 = 0
+	for pos := n - 1; pos >= 0; pos-- {
 		for _, pattern := range patterns {
 			plen := len(pattern)
 			if pos+plen <= n && design[pos:pos+plen] == pattern {
-				total += dp(pos + plen)
+				dp[pos] += dp[pos+plen]
 			}
 		}
-
-		memo[pos] = total
-		return total
 	}
-
-	return dp(0)
+	return dp[0]
 }
 
-func part1(designs []string) int {
-	count := 0
+// solve computes both part1 and part2 in a single pass over designs.
+// Returns the count of possible designs and total number of arrangements.
+func solve(patterns, designs []string) (int, int64) {
+	var possible int
+	var totalWays int64
 	for _, design := range designs {
-		if countWays(design) > 0 {
-			count++
+		ways := countWays(design, patterns)
+		if ways > 0 {
+			possible++
 		}
+		totalWays += ways
 	}
-	return count
-}
-
-func part2(designs []string) int64 {
-	var total int64 = 0
-	for _, design := range designs {
-		total += countWays(design)
-	}
-	return total
+	return possible, totalWays
 }
 
 func main() {
-	exePath, _ := os.Executable()
+	exePath, err := os.Executable()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error getting executable path: %v\n", err)
+		os.Exit(1)
+	}
 	exeDir := filepath.Dir(exePath)
 	inputPath := filepath.Join(exeDir, "..", "input.txt")
 
@@ -80,7 +69,7 @@ func main() {
 
 	// Parse patterns
 	patternParts := strings.Split(parts[0], ",")
-	patterns = make([]string, len(patternParts))
+	patterns := make([]string, len(patternParts))
 	for i, p := range patternParts {
 		patterns[i] = strings.TrimSpace(p)
 	}
@@ -88,6 +77,7 @@ func main() {
 	// Parse designs
 	designs := strings.Split(strings.TrimSpace(parts[1]), "\n")
 
-	fmt.Printf("Part 1: %d\n", part1(designs))
-	fmt.Printf("Part 2: %d\n", part2(designs))
+	part1, part2 := solve(patterns, designs)
+	fmt.Printf("Part 1: %d\n", part1)
+	fmt.Printf("Part 2: %d\n", part2)
 }

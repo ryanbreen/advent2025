@@ -2,56 +2,76 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <unordered_map>
 #include <cstdint>
 
-std::vector<std::string> patterns;
+class Solver {
+    std::vector<std::string> patterns;
 
-// Count number of ways to form design from patterns using memoization
-int64_t countWays(const std::string& design, size_t pos,
-                  std::unordered_map<size_t, int64_t>& memo) {
-    if (pos == design.length()) {
-        return 1;
+    bool startsWith(std::string_view str, std::string_view prefix) const {
+        return str.size() >= prefix.size() &&
+               str.substr(0, prefix.size()) == prefix;
     }
 
-    auto it = memo.find(pos);
-    if (it != memo.end()) {
-        return it->second;
-    }
-
-    int64_t total = 0;
-    for (const auto& pattern : patterns) {
-        size_t plen = pattern.length();
-        if (pos + plen <= design.length() &&
-            design.compare(pos, plen, pattern) == 0) {
-            total += countWays(design, pos + plen, memo);
+    int64_t countWaysImpl(std::string_view design, size_t pos,
+                          std::unordered_map<size_t, int64_t>& memo) {
+        if (pos == design.size()) {
+            return 1;
         }
+
+        if (auto [it, inserted] = memo.try_emplace(pos, 0); !inserted) {
+            return it->second;
+        }
+
+        std::string_view remaining = design.substr(pos);
+        int64_t total = 0;
+
+        for (const auto& pattern : patterns) {
+            if (startsWith(remaining, pattern)) {
+                total += countWaysImpl(design, pos + pattern.size(), memo);
+            }
+        }
+
+        memo[pos] = total;
+        return total;
     }
 
-    memo[pos] = total;
-    return total;
+public:
+    explicit Solver(std::vector<std::string> p) : patterns(std::move(p)) {}
+
+    int64_t countWays(std::string_view design) {
+        std::unordered_map<size_t, int64_t> memo;
+        return countWaysImpl(design, 0, memo);
+    }
+};
+
+std::string trim(std::string_view str) {
+    size_t start = str.find_first_not_of(" ");
+    if (start == std::string_view::npos) return "";
+    size_t end = str.find_last_not_of(" ");
+    return std::string(str.substr(start, end - start + 1));
 }
 
 int main() {
     std::ifstream file("../input.txt");
     if (!file) {
-        std::cerr << "Could not open input.txt" << std::endl;
+        std::cerr << "Could not open input.txt" << '\n';
         return 1;
     }
 
     std::string line;
+    std::vector<std::string> patterns;
 
     // Parse patterns (first line)
     std::getline(file, line);
     std::stringstream ss(line);
     std::string pattern;
     while (std::getline(ss, pattern, ',')) {
-        // Trim whitespace
-        size_t start = pattern.find_first_not_of(" ");
-        size_t end = pattern.find_last_not_of(" ");
-        if (start != std::string::npos) {
-            patterns.push_back(pattern.substr(start, end - start + 1));
+        std::string trimmed = trim(pattern);
+        if (!trimmed.empty()) {
+            patterns.push_back(std::move(trimmed));
         }
     }
 
@@ -62,24 +82,25 @@ int main() {
     std::vector<std::string> designs;
     while (std::getline(file, line)) {
         if (!line.empty()) {
-            designs.push_back(line);
+            designs.push_back(std::move(line));
         }
     }
+
+    Solver solver(std::move(patterns));
 
     int64_t part1 = 0;
     int64_t part2 = 0;
 
     for (const auto& design : designs) {
-        std::unordered_map<size_t, int64_t> memo;
-        int64_t ways = countWays(design, 0, memo);
+        int64_t ways = solver.countWays(design);
         if (ways > 0) {
             part1++;
         }
         part2 += ways;
     }
 
-    std::cout << "Part 1: " << part1 << std::endl;
-    std::cout << "Part 2: " << part2 << std::endl;
+    std::cout << "Part 1: " << part1 << '\n';
+    std::cout << "Part 2: " << part2 << '\n';
 
     return 0;
 }

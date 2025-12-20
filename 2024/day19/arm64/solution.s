@@ -33,6 +33,7 @@ part2_msg:      .asciz "Part 2: "
 newline:        .asciz "\n"
 error_msg:      .asciz "Error reading file\n"
 
+// .align 3 ensures 8-byte (2^3) alignment for 64-bit pointer access
 .align 3
 // File I/O buffer
 file_buffer:    .space MAX_INPUT_SIZE
@@ -134,6 +135,7 @@ error_exit:
 // ============================================================================
 parse_input:
     stp     x29, x30, [sp, #-16]!
+    mov     x29, sp                         // Set up frame pointer for debugging
     stp     x19, x20, [sp, #-16]!
     stp     x21, x22, [sp, #-16]!
     stp     x23, x24, [sp, #-16]!
@@ -145,25 +147,30 @@ parse_input:
 
     // Parse patterns (comma and space separated)
 parse_patterns:
-    // Skip leading whitespace
-1:  ldrb    w0, [x19]
+    // Skip leading whitespace and delimiters
+skip_pattern_delim:
+    ldrb    w0, [x19]
     cbz     w0, patterns_done
     cmp     w0, #' '
-    b.eq    2f
+    b.eq    advance_pattern_ptr
     cmp     w0, #','
-    b.eq    2f
+    b.eq    advance_pattern_ptr
     cmp     w0, #'\n'
     b.eq    patterns_done
-    b       3f
-2:  add     x19, x19, #1
-    b       1b
+    b       start_pattern
 
-3:  // Start of pattern - save pointer
+advance_pattern_ptr:
+    add     x19, x19, #1
+    b       skip_pattern_delim
+
+start_pattern:
+    // Start of pattern - save pointer
     str     x19, [x20, x22, lsl #3]
     mov     x23, #0                         // Pattern length
 
     // Find end of pattern
-4:  ldrb    w0, [x19]
+scan_pattern_char:
+    ldrb    w0, [x19]
     cbz     w0, save_pattern
     cmp     w0, #','
     b.eq    save_pattern
@@ -173,7 +180,7 @@ parse_patterns:
     b.eq    save_pattern
     add     x19, x19, #1
     add     x23, x23, #1
-    b       4b
+    b       scan_pattern_char
 
 save_pattern:
     // Null-terminate the pattern in place
@@ -213,16 +220,18 @@ parse_designs:
 
     // Skip any leading newlines
     cmp     w0, #'\n'
-    b.ne    5f
+    b.ne    start_design
     add     x19, x19, #1
     b       parse_designs
 
-5:  // Start of design - save pointer
+start_design:
+    // Start of design - save pointer
     str     x19, [x20, x22, lsl #3]
     mov     x23, #0                         // Design length
 
     // Find end of design (newline or null)
-6:  ldrb    w0, [x19]
+scan_design_char:
+    ldrb    w0, [x19]
     cbz     w0, save_design
     cmp     w0, #'\n'
     b.eq    save_design
@@ -230,7 +239,7 @@ parse_designs:
     b.eq    save_design
     add     x19, x19, #1
     add     x23, x23, #1
-    b       6b
+    b       scan_design_char
 
 save_design:
     // Only save if length > 0
@@ -264,6 +273,7 @@ parse_done:
 // ============================================================================
 count_ways:
     stp     x29, x30, [sp, #-16]!
+    mov     x29, sp                         // Set up frame pointer for debugging
     stp     x19, x20, [sp, #-16]!
     stp     x21, x22, [sp, #-16]!
     stp     x23, x24, [sp, #-16]!
@@ -361,25 +371,22 @@ dp_done:
 // Output: x0 = 0 if equal, non-zero otherwise
 // ============================================================================
 strncmp_impl:
-    cbz     x2, strcmp_equal
-strcmp_loop:
+    cbz     x2, strncmp_equal
+strncmp_loop:
     ldrb    w3, [x0], #1
     ldrb    w4, [x1], #1
     subs    x2, x2, #1
-    cbz     x2, strcmp_compare
+    cbz     x2, strncmp_return_diff
     cmp     w3, w4
-    b.ne    strcmp_diff
-    b       strcmp_loop
+    b.ne    strncmp_return_diff
+    b       strncmp_loop
 
-strcmp_compare:
+strncmp_return_diff:
+    // Return difference (0 if equal, non-zero if different)
     sub     w0, w3, w4
     ret
 
-strcmp_diff:
-    sub     w0, w3, w4
-    ret
-
-strcmp_equal:
+strncmp_equal:
     mov     x0, #0
     ret
 
@@ -388,6 +395,7 @@ strcmp_equal:
 // ============================================================================
 solve:
     stp     x29, x30, [sp, #-16]!
+    mov     x29, sp                         // Set up frame pointer for debugging
     stp     x19, x20, [sp, #-16]!
     stp     x21, x22, [sp, #-16]!
     stp     x23, x24, [sp, #-16]!
@@ -442,18 +450,21 @@ solve_done:
 // ============================================================================
 print_str:
     stp     x29, x30, [sp, #-16]!
+    mov     x29, sp                         // Set up frame pointer for debugging
     stp     x19, x20, [sp, #-16]!
 
     mov     x19, x0
 
-    // Find length
+    // Find string length by scanning for null terminator
     mov     x20, #0
-1:  ldrb    w1, [x19, x20]
-    cbz     w1, 2f
+print_str_scan:
+    ldrb    w1, [x19, x20]
+    cbz     w1, print_str_write
     add     x20, x20, #1
-    b       1b
+    b       print_str_scan
 
-2:  // Write to stdout
+print_str_write:
+    // Write to stdout
     mov     x0, #1
     mov     x1, x19
     mov     x2, x20
@@ -470,7 +481,10 @@ print_str:
 // ============================================================================
 print_num:
     stp     x29, x30, [sp, #-16]!
+    mov     x29, sp                         // Set up frame pointer for debugging
     stp     x19, x20, [sp, #-16]!
+    // Allocate 32-byte buffer for digit conversion (max 20 digits for 64-bit + null)
+    // We use offset #31 to build the string backwards from the end
     sub     sp, sp, #32
 
     mov     x19, x0
@@ -478,23 +492,26 @@ print_num:
     strb    wzr, [x20]
 
     // Handle zero case
-    cbnz    x19, 1f
+    cbnz    x19, print_num_loop
     sub     x20, x20, #1
     mov     w0, #'0'
     strb    w0, [x20]
-    b       2f
+    b       print_num_output
 
-1:  cbz     x19, 2f
+print_num_loop:
+    // Convert digits: repeatedly divide by 10, store remainder as ASCII digit
+    cbz     x19, print_num_output
     mov     x1, #10
-    udiv    x2, x19, x1
-    msub    x3, x2, x1, x19
-    add     w3, w3, #'0'
+    udiv    x2, x19, x1                     // quotient
+    msub    x3, x2, x1, x19                 // remainder = n - (quotient * 10)
+    add     w3, w3, #'0'                    // convert to ASCII
     sub     x20, x20, #1
     strb    w3, [x20]
     mov     x19, x2
-    b       1b
+    b       print_num_loop
 
-2:  mov     x0, x20
+print_num_output:
+    mov     x0, x20
     bl      print_str
 
     add     sp, sp, #32

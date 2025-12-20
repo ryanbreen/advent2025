@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  * Advent of Code 2024 - Day 19: Linen Layout
  *
@@ -6,35 +8,6 @@
  * Part 2: Sum the NUMBER OF WAYS each design can be formed
  * Uses dynamic programming with memoization
  */
-
-$input = trim(file_get_contents(__DIR__ . '/../input.txt'));
-$parts = explode("\n\n", $input);
-
-$patterns = array_map('trim', explode(',', $parts[0]));
-$designs = explode("\n", trim($parts[1]));
-
-/**
- * Check if a design can be formed by concatenating patterns.
- */
-function canForm(string $design, array $patterns): bool {
-    $len = strlen($design);
-    $dp = array_fill(0, $len + 1, false);
-    $dp[0] = true;
-
-    for ($i = 0; $i < $len; $i++) {
-        if (!$dp[$i]) {
-            continue;
-        }
-        foreach ($patterns as $pattern) {
-            $plen = strlen($pattern);
-            if ($i + $plen <= $len && substr($design, $i, $plen) === $pattern) {
-                $dp[$i + $plen] = true;
-            }
-        }
-    }
-
-    return $dp[$len];
-}
 
 /**
  * Count the number of ways to form design from patterns.
@@ -50,7 +23,7 @@ function countWays(string $design, array $patterns): int {
         }
         foreach ($patterns as $pattern) {
             $plen = strlen($pattern);
-            if ($i + $plen <= $len && substr($design, $i, $plen) === $pattern) {
+            if ($i + $plen <= $len && substr_compare($design, $pattern, $i, $plen) === 0) {
                 $dp[$i + $plen] += $dp[$i];
             }
         }
@@ -59,23 +32,16 @@ function countWays(string $design, array $patterns): int {
     return $dp[$len];
 }
 
-function part1(array $designs, array $patterns): int {
-    $count = 0;
-    foreach ($designs as $design) {
-        if (canForm($design, $patterns)) {
-            $count++;
-        }
-    }
-    return $count;
-}
+(function(): void {
+    $input = trim(file_get_contents(__DIR__ . '/../input.txt'));
+    [$patternSection, $designSection] = explode("\n\n", $input);
 
-function part2(array $designs, array $patterns): int {
-    $total = 0;
-    foreach ($designs as $design) {
-        $total += countWays($design, $patterns);
-    }
-    return $total;
-}
+    $patterns = array_map(trim(...), explode(',', $patternSection));
+    $designs = explode("\n", trim($designSection));
 
-echo "Part 1: " . part1($designs, $patterns) . "\n";
-echo "Part 2: " . part2($designs, $patterns) . "\n";
+    $part1 = count(array_filter($designs, fn(string $d): bool => countWays($d, $patterns) > 0));
+    $part2 = array_sum(array_map(fn(string $d): int => countWays($d, $patterns), $designs));
+
+    echo "Part 1: {$part1}\n";
+    echo "Part 2: {$part2}\n";
+})();

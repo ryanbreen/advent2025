@@ -5,13 +5,10 @@
 
 set -euo pipefail
 
-INPUT_FILE="${1:-../input.txt}"
+readonly INPUT_FILE="${1:-../input.txt}"
 
 # Read input
 input=$(<"$INPUT_FILE")
-
-# Parse patterns (first line, comma-separated)
-IFS=$'\n' read -rd '' -a sections <<< "${input//$'\n\n'/$'\n'$'\n'}" || true
 
 # Get first line as patterns
 patterns_line=$(echo "$input" | head -n 1)
@@ -21,9 +18,9 @@ IFS=', ' read -ra patterns <<< "$patterns_line"
 # Get designs (after blank line)
 mapfile -t designs < <(echo "$input" | tail -n +3)
 
-# Trim whitespace from patterns
+# Trim whitespace from patterns (handles tabs, spaces, carriage returns, etc.)
 for i in "${!patterns[@]}"; do
-    patterns[$i]="${patterns[$i]// /}"
+    patterns[$i]="${patterns[$i]//[[:space:]]/}"
 done
 
 # Part 1: Count designs that can be formed
@@ -78,7 +75,7 @@ count_ways() {
                 local substr="${design:pos:plen}"
                 if [[ "$substr" == "$pattern" ]]; then
                     # Add dp[end] to dp[pos] using bc for large numbers
-                    dp[$pos]=$(echo "${dp[$pos]:-0} + ${dp[$end]:-0}" | bc)
+                    dp[$pos]=$(bc <<< "${dp[$pos]:-0} + ${dp[$end]:-0}")
                 fi
             fi
         done
@@ -101,6 +98,6 @@ part2_sum=0
 for design in "${designs[@]}"; do
     [[ -z "$design" ]] && continue
     ways=$(count_ways "$design")
-    part2_sum=$(echo "$part2_sum + $ways" | bc)
+    part2_sum=$(bc <<< "$part2_sum + $ways")
 done
 echo "Part 2: $part2_sum"

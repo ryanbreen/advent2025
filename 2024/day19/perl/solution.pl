@@ -1,8 +1,10 @@
 #!/usr/bin/env perl
+use v5.16;
 use strict;
 use warnings;
 use File::Basename;
 use File::Spec;
+use List::Util qw(sum);
 
 my $dir = dirname(__FILE__);
 my $input_file = File::Spec->catfile($dir, '..', 'input.txt');
@@ -16,32 +18,6 @@ $input =~ s/\s+$//;
 my ($patterns_str, $designs_str) = split /\n\n/, $input, 2;
 my @patterns = map { s/^\s+|\s+$//gr } split /,/, $patterns_str;
 my @designs = split /\n/, $designs_str;
-
-sub can_form {
-    my ($design) = @_;
-    my %memo;
-
-    my $dp;
-    $dp = sub {
-        my ($pos) = @_;
-        return 1 if $pos == length($design);
-        return $memo{$pos} if exists $memo{$pos};
-
-        for my $pattern (@patterns) {
-            my $plen = length($pattern);
-            if (substr($design, $pos, $plen) eq $pattern) {
-                if ($dp->($pos + $plen)) {
-                    $memo{$pos} = 1;
-                    return 1;
-                }
-            }
-        }
-        $memo{$pos} = 0;
-        return 0;
-    };
-
-    return $dp->(0);
-}
 
 sub count_ways {
     my ($design) = @_;
@@ -68,20 +44,12 @@ sub count_ways {
 }
 
 sub part1 {
-    my $count = 0;
-    for my $design (@designs) {
-        $count++ if can_form($design);
-    }
-    return $count;
+    scalar grep { count_ways($_) > 0 } @designs;
 }
 
 sub part2 {
-    my $total = 0;
-    for my $design (@designs) {
-        $total += count_ways($design);
-    }
-    return $total;
+    sum map { count_ways($_) } @designs;
 }
 
-print "Part 1: ", part1(), "\n";
-print "Part 2: ", part2(), "\n";
+say "Part 1: ", part1();
+say "Part 2: ", part2();

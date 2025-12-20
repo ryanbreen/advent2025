@@ -1,6 +1,5 @@
 const std = @import("std");
 const ArrayList = std.ArrayList;
-const AutoHashMap = std.AutoHashMap;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -60,40 +59,36 @@ pub fn main() !void {
         part2 += ways;
     }
 
-    std.debug.print("Part 1: {d}\n", .{part1});
-    std.debug.print("Part 2: {d}\n", .{part2});
+    const stdout = std.fs.File.stdout();
+    var buf: [64]u8 = undefined;
+    const output = std.fmt.bufPrint(&buf, "Part 1: {d}\nPart 2: {d}\n", .{ part1, part2 }) catch unreachable;
+    _ = stdout.write(output) catch {};
 }
 
+/// Counts the number of ways to form the given design using the available patterns.
+/// Uses bottom-up dynamic programming where dp[i] represents the number of ways
+/// to form design[i..]. Returns 0 if the design cannot be formed.
 fn countWays(allocator: std.mem.Allocator, design: []const u8, patterns: []const []const u8) !u64 {
-    // dp[pos] = number of ways to form design[pos..]
-    // Use a HashMap for memoization
-    var memo = AutoHashMap(usize, u64).init(allocator);
-    defer memo.deinit();
+    // dp[i] = number of ways to form design[i..]
+    const dp = try allocator.alloc(u64, design.len + 1);
+    defer allocator.free(dp);
+    @memset(dp, 0);
 
-    return try dp(&memo, design, patterns, 0);
-}
+    // Base case: empty suffix has exactly one way (use no patterns)
+    dp[design.len] = 1;
 
-fn dp(memo: *AutoHashMap(usize, u64), design: []const u8, patterns: []const []const u8, pos: usize) !u64 {
-    if (pos == design.len) {
-        return 1;
-    }
-
-    // Check memo
-    if (memo.get(pos)) |cached| {
-        return cached;
-    }
-
-    var total: u64 = 0;
-    for (patterns) |pattern| {
-        const plen = pattern.len;
-        if (pos + plen <= design.len) {
-            // Check if pattern matches at current position
-            if (std.mem.eql(u8, design[pos .. pos + plen], pattern)) {
-                total += try dp(memo, design, patterns, pos + plen);
+    // Fill from right to left
+    var i: usize = design.len;
+    while (i > 0) {
+        i -= 1;
+        for (patterns) |pattern| {
+            if (i + pattern.len <= design.len and
+                std.mem.eql(u8, design[i..][0..pattern.len], pattern))
+            {
+                dp[i] += dp[i + pattern.len];
             }
         }
     }
 
-    try memo.put(pos, total);
-    return total;
+    return dp[0];
 }

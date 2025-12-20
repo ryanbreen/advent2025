@@ -2,17 +2,20 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <inttypes.h>
 
 #define MAX_PATTERNS 500
 #define MAX_PATTERN_LEN 16
 #define MAX_DESIGNS 500
 #define MAX_DESIGN_LEN 128
+#define MAX_LINE_LEN 4096
 
 static char patterns[MAX_PATTERNS][MAX_PATTERN_LEN];
 static int pattern_lens[MAX_PATTERNS];
 static int num_patterns = 0;
 
 static char designs[MAX_DESIGNS][MAX_DESIGN_LEN];
+static int design_lens[MAX_DESIGNS];
 static int num_designs = 0;
 
 void parse_input(const char *filename) {
@@ -22,12 +25,16 @@ void parse_input(const char *filename) {
         exit(1);
     }
 
-    char line[4096];
+    char line[MAX_LINE_LEN];
 
     // Read patterns line
     if (fgets(line, sizeof(line), f)) {
         char *token = strtok(line, ", \n\r");
         while (token != NULL) {
+            if (num_patterns >= MAX_PATTERNS) {
+                fprintf(stderr, "Error: exceeded MAX_PATTERNS (%d)\n", MAX_PATTERNS);
+                exit(1);
+            }
             strncpy(patterns[num_patterns], token, MAX_PATTERN_LEN - 1);
             patterns[num_patterns][MAX_PATTERN_LEN - 1] = '\0';
             pattern_lens[num_patterns] = strlen(patterns[num_patterns]);
@@ -37,7 +44,10 @@ void parse_input(const char *filename) {
     }
 
     // Skip empty line
-    fgets(line, sizeof(line), f);
+    if (fgets(line, sizeof(line), f) == NULL) {
+        fprintf(stderr, "Error: expected empty line after patterns\n");
+        exit(1);
+    }
 
     // Read designs
     while (fgets(line, sizeof(line), f)) {
@@ -47,8 +57,13 @@ void parse_input(const char *filename) {
             line[--len] = '\0';
         }
         if (len > 0) {
+            if (num_designs >= MAX_DESIGNS) {
+                fprintf(stderr, "Error: exceeded MAX_DESIGNS (%d)\n", MAX_DESIGNS);
+                exit(1);
+            }
             strncpy(designs[num_designs], line, MAX_DESIGN_LEN - 1);
             designs[num_designs][MAX_DESIGN_LEN - 1] = '\0';
+            design_lens[num_designs] = strlen(designs[num_designs]);
             num_designs++;
         }
     }
@@ -93,7 +108,7 @@ int64_t count_ways(const char *design, int design_len) {
 int part1(void) {
     int count = 0;
     for (int d = 0; d < num_designs; d++) {
-        if (count_ways(designs[d], strlen(designs[d])) > 0) {
+        if (count_ways(designs[d], design_lens[d]) > 0) {
             count++;
         }
     }
@@ -103,7 +118,7 @@ int part1(void) {
 int64_t part2(void) {
     int64_t total = 0;
     for (int d = 0; d < num_designs; d++) {
-        total += count_ways(designs[d], strlen(designs[d]));
+        total += count_ways(designs[d], design_lens[d]);
     }
     return total;
 }
@@ -112,7 +127,7 @@ int main(void) {
     parse_input("../input.txt");
 
     printf("Part 1: %d\n", part1());
-    printf("Part 2: %lld\n", part2());
+    printf("Part 2: %" PRId64 "\n", part2());
 
     return 0;
 }

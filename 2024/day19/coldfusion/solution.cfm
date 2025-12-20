@@ -18,17 +18,14 @@ allLines = listToArray(inputText, chr(10), true);
 
 // First line contains patterns (comma-separated)
 patternLine = allLines[1];
-patterns = [];
-for (p in listToArray(patternLine, ",")) {
-    arrayAppend(patterns, trim(p));
-}
+patterns = listToArray(patternLine, ",").map(function(p) { return trim(p); });
 
 // Skip the blank line (line 2), remaining lines are designs
 designs = [];
-for (i = 3; i <= arrayLen(allLines); i++) {
+for (i = 3; i <= allLines.len(); i++) {
     line = trim(allLines[i]);
     if (len(line) > 0) {
-        arrayAppend(designs, line);
+        designs.append(line);
     }
 }
 
@@ -49,26 +46,25 @@ function countWays(design, patterns) {
         }
 
         // Check memo
-        var key = pos;
-        if (structKeyExists(memo, key)) {
-            return memo[key];
+        if (memo.keyExists(pos)) {
+            return memo[pos];
         }
 
         var total = 0;
 
         // Try each pattern
         for (var pattern in patterns) {
-            var plen = len(pattern);
+            var patternLength = len(pattern);
             // Check if pattern matches at current position
-            if (pos + plen - 1 <= designLen) {
-                var substring = mid(design, pos, plen);
+            if (pos + patternLength - 1 <= designLen) {
+                var substring = mid(design, pos, patternLength);
                 if (substring == pattern) {
-                    total += dp(pos + plen);
+                    total += dp(pos + patternLength);
                 }
             }
         }
 
-        memo[key] = total;
+        memo[pos] = total;
         return total;
     };
 

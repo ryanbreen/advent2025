@@ -5,25 +5,11 @@
 
 (defun split-by-comma (string)
   "Split a string by comma into a list of trimmed strings."
-  (let ((result '())
-        (current "")
-        (in-token nil))
-    (loop for char across string
-          do (cond
-               ((char= char #\,)
-                (when in-token
-                  (push (string-trim '(#\Space #\Tab) current) result)
-                  (setf current "")
-                  (setf in-token nil)))
-               ((member char '(#\Space #\Tab))
-                (when in-token
-                  (setf current (concatenate 'string current (string char)))))
-               (t
-                (setf in-token t)
-                (setf current (concatenate 'string current (string char))))))
-    (when (and in-token (> (length current) 0))
-      (push (string-trim '(#\Space #\Tab) current) result))
-    (nreverse result)))
+  (loop for start = 0 then (1+ end)
+        for end = (position #\, string :start start)
+        collect (string-trim '(#\Space #\Tab)
+                             (subseq string start (or end (length string))))
+        while end))
 
 (defun read-input (filename)
   "Read input file, returning (patterns . designs)."
@@ -41,16 +27,15 @@
                    (push trimmed designs))))
       (cons patterns (nreverse designs)))))
 
-(defun string-prefix-p (prefix string start)
-  "Check if STRING starting at START has PREFIX."
-  (let ((prefix-len (length prefix))
-        (string-len (length string)))
-    (when (<= (+ start prefix-len) string-len)
-      (loop for i from 0 below prefix-len
-            always (char= (char prefix i) (char string (+ start i)))))))
+(defun string-prefix-p (prefix prefix-len string start string-len)
+  "Check if STRING starting at START has PREFIX of length PREFIX-LEN."
+  (let ((end (+ start prefix-len)))
+    (and (<= end string-len)
+         (not (mismatch prefix string :start2 start :end2 end)))))
 
-(defun count-ways (design patterns)
-  "Count the number of ways to form DESIGN from PATTERNS using DP with memoization."
+(defun count-ways (design patterns-with-lengths)
+  "Count the number of ways to form DESIGN from PATTERNS-WITH-LENGTHS using DP with memoization.
+   PATTERNS-WITH-LENGTHS is a list of (pattern . length) pairs."
   (let ((memo (make-hash-table :test 'eql))
         (design-len (length design)))
     (labels ((dp (pos)
@@ -59,32 +44,26 @@
                  ((gethash pos memo))
                  (t
                   (let ((total 0))
-                    (dolist (pattern patterns)
-                      (when (string-prefix-p pattern design pos)
-                        (incf total (dp (+ pos (length pattern))))))
+                    (dolist (pl patterns-with-lengths)
+                      (let ((pattern (car pl))
+                            (plen (cdr pl)))
+                        (when (string-prefix-p pattern plen design pos design-len)
+                          (incf total (dp (+ pos plen))))))
                     (setf (gethash pos memo) total)
                     total)))))
       (dp 0))))
-
-(defun part1 (patterns designs)
-  "Count how many designs can be formed by patterns."
-  (count-if (lambda (design)
-              (> (count-ways design patterns) 0))
-            designs))
-
-(defun part2 (patterns designs)
-  "Sum the number of ways to form each design."
-  (reduce #'+ (mapcar (lambda (design)
-                        (count-ways design patterns))
-                      designs)))
 
 (defun main ()
   "Main entry point."
   (let* ((input-file (merge-pathnames "../input.txt" *load-truename*))
          (input (read-input input-file))
          (patterns (car input))
-         (designs (cdr input)))
-    (format t "Part 1: ~A~%" (part1 patterns designs))
-    (format t "Part 2: ~A~%" (part2 patterns designs))))
+         (designs (cdr input))
+         ;; Pre-compute pattern lengths
+         (patterns-with-lengths (mapcar (lambda (p) (cons p (length p))) patterns))
+         ;; Compute count-ways once per design
+         (counts (mapcar (lambda (d) (count-ways d patterns-with-lengths)) designs)))
+    (format t "Part 1: ~A~%" (count-if #'plusp counts))
+    (format t "Part 2: ~A~%" (reduce #'+ counts))))
 
 (main)
