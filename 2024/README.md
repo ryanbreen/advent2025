@@ -500,7 +500,7 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Python      | 3,662.4      | 23.3        |
 | Clojure     | 4,785.4      | 1,317.6     |
 | Perl        | 6,148.8      | 10.9        |
-| C++         | 7,532.4      | 4.5         |
+| C++         | 180.7        | 4.3         |
 | ColdFusion  | 14,862.1     | 1,067.6     |
 | Ruby        | 17,609.8     | 37.3        |
 | Common Lisp | 34,551.6     | 98.5        |

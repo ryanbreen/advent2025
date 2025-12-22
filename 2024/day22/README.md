@@ -73,7 +73,7 @@ secret &= 0xFFFFFF        // prune
 
 ### Fast Performers
 - **ARM64 Assembly** (60ms): Direct syscalls, manual memory management, bit operations map directly to CPU instructions. Fixed-size arrays avoid heap allocation overhead.
-- **C** (182ms): Efficient array-based implementation with direct memory access.
+- **C/C++** (180-182ms): Efficient array-based implementations with direct memory access. C++ uses packed integer keys and stack-allocated arrays.
 - **Rust** (206ms): Zero-cost abstractions, efficient HashMap implementation.
 
 ### Moderate Performers
@@ -82,9 +82,9 @@ secret &= 0xFFFFFF        // prune
 - **Java** (835ms): Reasonable but high memory usage (732MB) due to object overhead.
 
 ### Slower Performers
-- **C++** (7.5s): Surprisingly slow - likely due to `std::map` (tree-based O(log n)) instead of `std::unordered_map` (O(1) hash-based).
 - **Common Lisp** (34.5s): Interpreted nature and dynamic typing add overhead.
 - **Ruby** (17.6s): Dynamic language overhead for this computation-heavy problem.
+- **Perl** (6.1s): Hash-heavy operations with dynamic typing.
 
 ### Memory Considerations
 - **Zig/Rust**: Most memory-efficient (2-3 MB) with stack allocation and efficient data structures.
@@ -103,6 +103,7 @@ Bash Part 2 times out because:
 |-------------|--------------|-------------|
 | ARM64 asm   | 59.6         | 9.5         |
 | C           | 182.1        | 24.3        |
+| C++         | 180.7        | 4.3         |
 | Rust        | 206.4        | 3.1         |
 | Zig         | 265.2        | 2.4         |
 | Go          | 411.0        | 13.7        |
@@ -112,7 +113,6 @@ Bash Part 2 times out because:
 | Python      | 3,662.4      | 23.3        |
 | Clojure     | 4,785.4      | 1,317.6     |
 | Perl        | 6,148.8      | 10.9        |
-| C++         | 7,532.4      | 4.5         |
 | ColdFusion  | 14,862.1     | 1,067.6     |
 | Ruby        | 17,609.8     | 37.3        |
 | Common Lisp | 34,551.6     | 98.5        |

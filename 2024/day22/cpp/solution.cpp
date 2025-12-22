@@ -4,58 +4,42 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
-#include <tuple>
+#include <cstdint>
 #include <algorithm>
 
 using namespace std;
 
-// Custom hash for tuple<int, int, int, int>
-struct TupleHash {
-    size_t operator()(const tuple<int, int, int, int>& t) const {
-        size_t h1 = hash<int>{}(get<0>(t));
-        size_t h2 = hash<int>{}(get<1>(t));
-        size_t h3 = hash<int>{}(get<2>(t));
-        size_t h4 = hash<int>{}(get<3>(t));
-        return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3);
-    }
-};
+constexpr int SECRET_COUNT = 2000;
+constexpr int32_t PRUNE_MASK = 0xFFFFFF;  // 2^24 - 1
 
-long long next_secret(long long secret) {
-    // Step 1: multiply by 64 (shift left 6), mix (XOR), prune (mod 16777216)
+int32_t next_secret(int32_t secret) {
+    // Step 1: multiply by 64 (shift left 6), mix (XOR), prune (mask)
     secret ^= (secret << 6);
-    secret &= 0xFFFFFF;  // Same as % 16777216 (2^24)
+    secret &= PRUNE_MASK;
 
-    // Step 2: divide by 32 (shift right 5), mix (XOR), prune
+    // Step 2: divide by 32 (shift right 5), mix, prune
     secret ^= (secret >> 5);
-    secret &= 0xFFFFFF;
+    secret &= PRUNE_MASK;
 
-    // Step 3: multiply by 2048 (shift left 11), mix (XOR), prune
+    // Step 3: multiply by 2048 (shift left 11), mix, prune
     secret ^= (secret << 11);
-    secret &= 0xFFFFFF;
+    secret &= PRUNE_MASK;
 
     return secret;
 }
 
-vector<long long> generate_secrets(long long initial, int count) {
-    vector<long long> secrets;
-    secrets.reserve(count + 1);
-    secrets.push_back(initial);
-
-    long long secret = initial;
-    for (int i = 0; i < count; i++) {
-        secret = next_secret(secret);
-        secrets.push_back(secret);
-    }
-
-    return secrets;
+// Pack 4 changes into a 32-bit key for efficient hashing
+// Each change is -9 to 9, add 9 to make it 0 to 18, fits in 5 bits
+inline int32_t pack_sequence(int8_t c1, int8_t c2, int8_t c3, int8_t c4) {
+    return ((c1 + 9) << 15) | ((c2 + 9) << 10) | ((c3 + 9) << 5) | (c4 + 9);
 }
 
-long long part1(const vector<long long>& initial_secrets) {
-    long long total = 0;
+int64_t part1(const vector<int32_t>& initial_secrets) {
+    int64_t total = 0;
 
-    for (long long initial : initial_secrets) {
-        long long secret = initial;
-        for (int i = 0; i < 2000; i++) {
+    for (int32_t initial : initial_secrets) {
+        int32_t secret = initial;
+        for (int i = 0; i < SECRET_COUNT; i++) {
             secret = next_secret(secret);
         }
         total += secret;
@@ -64,44 +48,42 @@ long long part1(const vector<long long>& initial_secrets) {
     return total;
 }
 
-long long part2(const vector<long long>& initial_secrets) {
-    // Map from (change1, change2, change3, change4) -> total bananas
-    unordered_map<tuple<int, int, int, int>, long long, TupleHash> sequence_totals;
+int32_t part2(const vector<int32_t>& initial_secrets) {
+    // Map from packed sequence -> total bananas
+    unordered_map<int32_t, int32_t> sequence_totals;
+    sequence_totals.reserve(200000);  // Pre-allocate for better performance
 
-    for (long long initial : initial_secrets) {
-        // Generate 2001 secrets (initial + 2000 new)
-        vector<long long> secrets = generate_secrets(initial, 2000);
+    for (int32_t initial : initial_secrets) {
+        int32_t secret = initial;
 
-        // Calculate prices (last digit of each secret)
-        vector<int> prices;
-        prices.reserve(secrets.size());
-        for (long long s : secrets) {
-            prices.push_back(s % 10);
-        }
+        // Generate prices and changes on-the-fly (no storage of all secrets)
+        int8_t prices[SECRET_COUNT + 1];
+        int8_t changes[SECRET_COUNT];
 
-        // Calculate changes
-        vector<int> changes;
-        changes.reserve(prices.size() - 1);
-        for (size_t i = 0; i < prices.size() - 1; i++) {
-            changes.push_back(prices[i + 1] - prices[i]);
+        prices[0] = secret % 10;
+        for (int i = 0; i < SECRET_COUNT; i++) {
+            secret = next_secret(secret);
+            prices[i + 1] = secret % 10;
+            changes[i] = prices[i + 1] - prices[i];
         }
 
         // Track first occurrence of each 4-change sequence for this buyer
-        unordered_set<tuple<int, int, int, int>, TupleHash> seen;
+        unordered_set<int32_t> seen;
+        seen.reserve(2000);  // Pre-allocate
 
-        for (size_t i = 0; i < changes.size() - 3; i++) {
-            auto seq = make_tuple(changes[i], changes[i+1], changes[i+2], changes[i+3]);
+        for (int i = 0; i < SECRET_COUNT - 3; i++) {
+            int32_t seq = pack_sequence(changes[i], changes[i+1], changes[i+2], changes[i+3]);
 
             if (seen.find(seq) == seen.end()) {
                 seen.insert(seq);
-                // Price we get is after these 4 changes
+                // Price we get is after these 4 changes (at index i+4)
                 sequence_totals[seq] += prices[i + 4];
             }
         }
     }
 
     // Find maximum total
-    long long max_bananas = 0;
+    int32_t max_bananas = 0;
     for (const auto& pair : sequence_totals) {
         max_bananas = max(max_bananas, pair.second);
     }
@@ -117,11 +99,11 @@ int main() {
         return 1;
     }
 
-    vector<long long> initial_secrets;
+    vector<int32_t> initial_secrets;
     string line;
     while (getline(infile, line)) {
         if (!line.empty()) {
-            initial_secrets.push_back(stoll(line));
+            initial_secrets.push_back(stoi(line));
         }
     }
     infile.close();
