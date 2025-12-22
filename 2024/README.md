@@ -459,3 +459,24 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Perl        | 28,291.0     | 10.2        |
 | Bash        | 84,810.1     | 6.5         |
 | ColdFusion  | 113,057.8    | 1,047.4     |
+
+### Day 21: Keypad Conundrum
+
+| Language    | Runtime (ms) | Memory (MB) |
+|-------------|--------------|-------------|
+| ARM64 asm   | 4.8          | 1.9         |
+| Zig         | 5.6          | 1.9         |
+| C           | 6.0          | 4.4         |
+| C++         | 6.7          | 1.9         |
+| Rust        | 6.8          | 1.9         |
+| Go          | 8.0          | 4.2         |
+| Perl        | 23.0         | 8.1         |
+| Python      | 26.4         | 15.9        |
+| Common Lisp | 31.4         | 41.9        |
+| Bash        | 33.3         | 15.9        |
+| Node.js     | 44.3         | 38.9        |
+| Ruby        | 62.5         | 27.8        |
+| Java        | 66.9         | 50.3        |
+| PHP         | 69.6         | 24.9        |
+| Clojure     | 418.9        | 133.6       |
+| ColdFusion  | 2,601.0      | 1,119.8     |
