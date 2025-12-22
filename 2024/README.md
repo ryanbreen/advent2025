@@ -26,6 +26,10 @@ Solutions implemented in 16 languages.
 | 18  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 19  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 20  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
+| 21  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
+| 22  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash*, Clojure, Common Lisp, ColdFusion |
+
+*Bash Part 1 works but Part 2 times out (solution is correct but takes >10 minutes)
 
 ## Benchmarks
 
@@ -480,3 +484,26 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | PHP         | 69.6         | 24.9        |
 | Clojure     | 418.9        | 133.6       |
 | ColdFusion  | 2,601.0      | 1,119.8     |
+
+### Day 22: Monkey Market
+
+| Language    | Runtime (ms) | Memory (MB) |
+|-------------|--------------|-------------|
+| ARM64 asm   | 59.6         | 9.5         |
+| C           | 182.1        | 24.3        |
+| Rust        | 206.4        | 3.1         |
+| Zig         | 265.2        | 2.4         |
+| Go          | 411.0        | 13.7        |
+| Java        | 834.7        | 732.1       |
+| Node.js     | 886.9        | 59.7        |
+| PHP         | 1,490.4      | 29.0        |
+| Python      | 3,662.4      | 23.3        |
+| Clojure     | 4,785.4      | 1,317.6     |
+| Perl        | 6,148.8      | 10.9        |
+| C++         | 7,532.4      | 4.5         |
+| ColdFusion  | 14,862.1     | 1,067.6     |
+| Ruby        | 17,609.8     | 37.3        |
+| Common Lisp | 34,551.6     | 98.5        |
+| Bash        | >120,000*    | -           |
+
+*Bash solution is correct but Part 2 requires extensive computation that exceeds practical time limits.
