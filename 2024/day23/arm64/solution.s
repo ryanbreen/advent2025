@@ -1,5 +1,5 @@
 // Day 23: LAN Party - ARM64 Assembly for macOS
-// Find triangles and maximum clique using Bron-Kerbosch algorithm
+// Find triangles and maximum clique using simple greedy algorithm
 
 .global _start
 .align 4
@@ -16,9 +16,6 @@
 input_path:     .asciz "../input.txt"
 part1_msg:      .asciz "Part 1: "
 part2_msg:      .asciz "Part 2: "
-debug_msg:      .asciz "Clique size: "
-debug_msg2:     .asciz "Cliques found: "
-debug_msg3:     .asciz "BK calls: "
 newline:        .asciz "\n"
 comma:          .asciz ","
 
@@ -30,23 +27,15 @@ file_buffer:    .space 65536
 nodes:          .space MAX_NODES * NODE_LEN    // Node names (2-char + null)
 node_count:     .space 8
 adj_matrix:     .space MAX_NODES * MAX_NODES   // Adjacency matrix (bytes)
-triangles:      .space 100000 * 12             // Triangle storage (3 ints each)
-triangle_count: .space 8
 part1_result:   .space 8
 part2_result:   .space 2048                    // Password string
 output_buffer:  .space 32
 
-// Bron-Kerbosch working memory
+// Working memory for Part 2
 max_clique:     .space MAX_NODES * 4           // Max clique node indices
 max_clique_size: .space 8
-r_set:          .space MAX_NODES               // Current clique
-p_set:          .space MAX_NODES               // Candidates
-x_set:          .space MAX_NODES               // Processed
-temp_set1:      .space MAX_NODES               // Temp working set
-temp_set2:      .space MAX_NODES               // Temp working set
-temp_set3:      .space MAX_NODES               // Temp working set
-debug_clique_count: .space 8                   // Debug counter
-debug_call_count: .space 8                     // Call counter
+current_clique: .space MAX_NODES * 4           // Current clique being built
+current_size:   .space 8
 
 // Text section
 .text
@@ -66,11 +55,31 @@ _start:
     // Part 1: Find triangles with 't' node
     bl      solve_part1
 
+    // Print Part 1 result
+    adrp    x0, part1_msg@PAGE
+    add     x0, x0, part1_msg@PAGEOFF
+    bl      print_string
+    adrp    x9, part1_result@PAGE
+    add     x9, x9, part1_result@PAGEOFF
+    ldr     x0, [x9]
+    bl      print_number
+    adrp    x0, newline@PAGE
+    add     x0, x0, newline@PAGEOFF
+    bl      print_string
+
     // Part 2: Find maximum clique
     bl      solve_part2
 
-    // Print results
-    bl      print_results
+    // Print Part 2 result
+    adrp    x0, part2_msg@PAGE
+    add     x0, x0, part2_msg@PAGEOFF
+    bl      print_string
+    adrp    x0, part2_result@PAGE
+    add     x0, x0, part2_result@PAGEOFF
+    bl      print_string
+    adrp    x0, newline@PAGE
+    add     x0, x0, newline@PAGEOFF
+    bl      print_string
 
     // Exit
     mov     x0, #0
@@ -372,7 +381,8 @@ tri_done:
     ldp     x29, x30, [sp], #80
     ret
 
-// Part 2: Find maximum clique using Bron-Kerbosch
+// Part 2: Find maximum clique using greedy algorithm
+// For each node, try to build the largest clique starting from that node
 solve_part2:
     stp     x29, x30, [sp, #-16]!
     mov     x29, sp
@@ -382,331 +392,136 @@ solve_part2:
     add     x9, x9, max_clique_size@PAGEOFF
     str     xzr, [x9]
 
-    // Initialize R = empty
-    adrp    x0, r_set@PAGE
-    add     x0, x0, r_set@PAGEOFF
-    mov     x1, #MAX_NODES
-    bl      memzero
+    // Load node count
+    adrp    x19, node_count@PAGE
+    add     x19, x19, node_count@PAGEOFF
+    ldr     x19, [x19]
 
-    // Initialize X = empty
-    adrp    x0, x_set@PAGE
-    add     x0, x0, x_set@PAGEOFF
-    mov     x1, #MAX_NODES
-    bl      memzero
+    // Try starting from each node
+    mov     x20, #0              // start_node
 
-    // Initialize P = all nodes
-    adrp    x0, p_set@PAGE
-    add     x0, x0, p_set@PAGEOFF
-    mov     x1, #MAX_NODES
-    bl      memzero
+try_each_start:
+    cmp     x20, x19
+    b.ge    part2_done
 
-    adrp    x9, node_count@PAGE
-    add     x9, x9, node_count@PAGEOFF
-    ldr     x10, [x9]
-    mov     x11, #0
+    // Build clique starting from x20
+    mov     x0, x20
+    bl      find_clique_from_node
 
-init_p_loop:
-    cmp     x11, x10
-    b.ge    init_p_done
-    mov     w12, #1
-    strb    w12, [x0, x11]
-    add     x11, x11, #1
-    b       init_p_loop
+    add     x20, x20, #1
+    b       try_each_start
 
-init_p_done:
-    // Call Bron-Kerbosch
-    bl      bron_kerbosch
-
-    // Debug: print call count
-    adrp    x0, debug_msg3@PAGE
-    add     x0, x0, debug_msg3@PAGEOFF
-    bl      print_string
-    adrp    x9, debug_call_count@PAGE
-    add     x9, x9, debug_call_count@PAGEOFF
-    ldr     x0, [x9]
-    bl      print_number
-    adrp    x0, newline@PAGE
-    add     x0, x0, newline@PAGEOFF
-    bl      print_string
-
-    // Debug: print clique count
-    adrp    x0, debug_msg2@PAGE
-    add     x0, x0, debug_msg2@PAGEOFF
-    bl      print_string
-    adrp    x9, debug_clique_count@PAGE
-    add     x9, x9, debug_clique_count@PAGEOFF
-    ldr     x0, [x9]
-    bl      print_number
-    adrp    x0, newline@PAGE
-    add     x0, x0, newline@PAGEOFF
-    bl      print_string
-
-    // Debug: print clique size
-    adrp    x0, debug_msg@PAGE
-    add     x0, x0, debug_msg@PAGEOFF
-    bl      print_string
-    adrp    x9, max_clique_size@PAGE
-    add     x9, x9, max_clique_size@PAGEOFF
-    ldr     x0, [x9]
-    bl      print_number
-    adrp    x0, newline@PAGE
-    add     x0, x0, newline@PAGEOFF
-    bl      print_string
-
+part2_done:
     // Build password string from max_clique
     bl      build_password
+
     ldp     x29, x30, [sp], #16
     ret
 
-// Bron-Kerbosch algorithm (with proper state management)
-// Allocate sets on stack to avoid corruption
-bron_kerbosch:
-    // Debug: increment call counter
-    adrp    x9, debug_call_count@PAGE
-    add     x9, x9, debug_call_count@PAGEOFF
-    ldr     x10, [x9]
-    add     x10, x10, #1
-    str     x10, [x9]
-
-    // Save registers first
-    stp     x29, x30, [sp, #-64]!
+// Find largest clique starting from a given node
+// Input: x0 = starting node index
+find_clique_from_node:
+    stp     x29, x30, [sp, #-80]!
     mov     x29, sp
     stp     x19, x20, [sp, #16]
     stp     x21, x22, [sp, #32]
     stp     x23, x24, [sp, #48]
+    stp     x25, x26, [sp, #64]
 
-    // Allocate space for local copies of R, P, X (3 * MAX_NODES = 3000 bytes)
-    sub     sp, sp, #3008
+    mov     x19, x0              // start_node
 
-    // Local set offsets relative to current sp
-    // r_local = sp + 0
-    // p_local = sp + 1000
-    // x_local = sp + 2000
+    // Initialize current_clique with start_node
+    adrp    x20, current_clique@PAGE
+    add     x20, x20, current_clique@PAGEOFF
+    str     w19, [x20]           // clique[0] = start_node
 
-    // Copy global R to local
-    mov     x0, sp               // r_local
-    adrp    x1, r_set@PAGE
-    add     x1, x1, r_set@PAGEOFF
-    mov     x2, #MAX_NODES
-    bl      memcpy_bytes
-
-    // Copy global P to local
-    add     x0, sp, #1000        // p_local
-    adrp    x1, p_set@PAGE
-    add     x1, x1, p_set@PAGEOFF
-    mov     x2, #MAX_NODES
-    bl      memcpy_bytes
-
-    // Copy global X to local
-    add     x0, sp, #2000        // x_local
-    adrp    x1, x_set@PAGE
-    add     x1, x1, x_set@PAGEOFF
-    mov     x2, #MAX_NODES
-    bl      memcpy_bytes
+    adrp    x21, current_size@PAGE
+    add     x21, x21, current_size@PAGEOFF
+    mov     x9, #1
+    str     x9, [x21]            // size = 1
 
     // Get node count
-    adrp    x21, node_count@PAGE
-    add     x21, x21, node_count@PAGEOFF
-    ldr     x21, [x21]
+    adrp    x22, node_count@PAGE
+    add     x22, x22, node_count@PAGEOFF
+    ldr     x22, [x22]
 
-    // Check if P and X are both empty
-    mov     x19, sp              // r_local
-    add     x20, sp, #1000       // p_local
-    add     x22, sp, #2000       // x_local
+    // Get adjacency matrix
+    adrp    x23, adj_matrix@PAGE
+    add     x23, x23, adj_matrix@PAGEOFF
 
-    mov     x9, #0
-    mov     x10, #0              // p_size
-    mov     x11, #0              // x_size
+    // Try to add each other node to the clique
+    mov     x24, #0              // candidate node
 
-bk_check_empty_loop:
-    cmp     x9, x21
-    b.ge    bk_check_empty_done
-    ldrb    w12, [x20, x9]
-    add     x10, x10, x12
-    ldrb    w12, [x22, x9]
-    add     x11, x11, x12
-    add     x9, x9, #1
-    b       bk_check_empty_loop
+try_add_loop:
+    cmp     x24, x22
+    b.ge    check_if_best
 
-bk_check_empty_done:
-    // If both empty (p_size == 0 AND x_size == 0), we found a maximal clique
-    orr     x12, x10, x11
-    cbnz    x12, bk_not_maximal
-    // If we get here, both are empty
+    // Skip if candidate is already in clique
+    cmp     x24, x19
+    b.eq    try_add_next
 
-    // Debug: we found a clique, count it
-    // Increment a counter (we'll use a global for this)
-    adrp    x25, debug_clique_count@PAGE
-    add     x25, x25, debug_clique_count@PAGEOFF
-    ldr     x26, [x25]
+    // Check if candidate is connected to ALL nodes in current clique
+    ldr     x25, [x21]           // current_size
+    mov     x26, #0              // clique_idx
+
+check_connections:
+    cmp     x26, x25
+    b.ge    add_to_clique        // All connections checked, can add
+
+    // Get node from clique
+    ldr     w9, [x20, x26, lsl #2]
+
+    // Check if adj[candidate][node]
+    mov     x10, #MAX_NODES
+    mul     x11, x24, x10
+    add     x11, x11, x9
+    ldrb    w12, [x23, x11]
+    cbz     w12, try_add_next    // Not connected, skip candidate
+
     add     x26, x26, #1
-    str     x26, [x25]
+    b       check_connections
 
-    // Count size of R
-    mov     x9, #0
-    mov     x23, #0              // r_size
+add_to_clique:
+    // Add candidate to clique
+    ldr     x25, [x21]
+    str     w24, [x20, x25, lsl #2]
+    add     x25, x25, #1
+    str     x25, [x21]
 
-bk_count_r_loop:
-    cmp     x9, x21
-    b.ge    bk_count_r_done
-    ldrb    w12, [x19, x9]
-    add     x23, x23, x12
-    add     x9, x9, #1
-    b       bk_count_r_loop
+try_add_next:
+    add     x24, x24, #1
+    b       try_add_loop
 
-bk_count_r_done:
-    // Compare with max_clique_size
-    adrp    x24, max_clique_size@PAGE
-    add     x24, x24, max_clique_size@PAGEOFF
-    ldr     x25, [x24]
-    cmp     x23, x25
-    b.le    bk_return
+check_if_best:
+    // Check if this clique is larger than max_clique
+    adrp    x9, max_clique_size@PAGE
+    add     x9, x9, max_clique_size@PAGEOFF
+    ldr     x10, [x9]
+    ldr     x11, [x21]           // current_size
 
-    // Update max clique
-    str     x23, [x24]
-    adrp    x24, max_clique@PAGE
-    add     x24, x24, max_clique@PAGEOFF
-    mov     x9, #0
-    mov     x10, #0              // clique index
+    cmp     x11, x10
+    b.le    find_clique_done
 
-bk_save_clique_loop:
-    cmp     x9, x21
-    b.ge    bk_return
-    ldrb    w12, [x19, x9]
-    cbz     w12, bk_save_clique_next
-    str     w9, [x24, x10, lsl #2]
-    add     x10, x10, #1
+    // Save as new max_clique
+    str     x11, [x9]
+    adrp    x12, max_clique@PAGE
+    add     x12, x12, max_clique@PAGEOFF
 
-bk_save_clique_next:
-    add     x9, x9, #1
-    b       bk_save_clique_loop
+    mov     x13, #0
+copy_clique:
+    cmp     x13, x11
+    b.ge    find_clique_done
+    ldr     w14, [x20, x13, lsl #2]
+    str     w14, [x12, x13, lsl #2]
+    add     x13, x13, #1
+    b       copy_clique
 
-bk_not_maximal:
-    // Iterate over P
-    mov     x23, #0              // node index
-
-bk_iter_loop:
-    cmp     x23, x21
-    b.ge    bk_return
-
-    ldrb    w24, [x20, x23]      // Check if in P
-    cbz     w24, bk_iter_next
-
-    // Get neighbors of v into temp_set1
-    adrp    x10, temp_set1@PAGE
-    add     x10, x10, temp_set1@PAGEOFF
-    mov     x0, x23
-    mov     x1, x10
-    bl      get_neighbors
-
-    // Copy global sets for recursion
-    // R_new = R ∪ {v}
-    adrp    x0, r_set@PAGE
-    add     x0, x0, r_set@PAGEOFF
-    mov     x1, x19              // r_local
-    mov     x2, #MAX_NODES
-    bl      memcpy_bytes
-    adrp    x9, r_set@PAGE
-    add     x9, x9, r_set@PAGEOFF
-    mov     w11, #1
-    strb    w11, [x9, x23]
-
-    // P_new = P ∩ N(v)
-    adrp    x0, p_set@PAGE
-    add     x0, x0, p_set@PAGEOFF
-    adrp    x10, temp_set1@PAGE
-    add     x10, x10, temp_set1@PAGEOFF
-    mov     x9, #0
-
-bk_intersect_p_loop:
-    cmp     x9, x21
-    b.ge    bk_intersect_p_done
-    ldrb    w11, [x20, x9]
-    ldrb    w12, [x10, x9]
-    and     w11, w11, w12
-    strb    w11, [x0, x9]
-    add     x9, x9, #1
-    b       bk_intersect_p_loop
-
-bk_intersect_p_done:
-    // X_new = X ∩ N(v)
-    adrp    x0, x_set@PAGE
-    add     x0, x0, x_set@PAGEOFF
-    mov     x9, #0
-
-bk_intersect_x_loop:
-    cmp     x9, x21
-    b.ge    bk_intersect_x_done
-    ldrb    w11, [x22, x9]
-    ldrb    w12, [x10, x9]
-    and     w11, w11, w12
-    strb    w11, [x0, x9]
-    add     x9, x9, #1
-    b       bk_intersect_x_loop
-
-bk_intersect_x_done:
-    // Recursive call
-    bl      bron_kerbosch
-
-    // After recursion, update local P and X
-    // Remove v from P
-    strb    wzr, [x20, x23]
-
-    // Add v to X
-    mov     w11, #1
-    strb    w11, [x22, x23]
-
-bk_iter_next:
-    add     x23, x23, #1
-    b       bk_iter_loop
-
-bk_return:
-    // Restore stack
-    add     sp, sp, #3008
+find_clique_done:
+    ldp     x25, x26, [sp, #64]
     ldp     x23, x24, [sp, #48]
     ldp     x21, x22, [sp, #32]
     ldp     x19, x20, [sp, #16]
-    ldp     x29, x30, [sp], #64
-    ret
-
-// Get neighbors of a node
-// Input: x0 = node index, x1 = output set address
-get_neighbors:
-    stp     x29, x30, [sp, #-32]!
-    mov     x29, sp
-    str     x19, [sp, #16]
-
-    mov     x19, x1              // Save output address
-
-    // Zero output
-    mov     x2, #MAX_NODES
-    bl      memzero
-
-    // Load adj matrix
-    adrp    x9, adj_matrix@PAGE
-    add     x9, x9, adj_matrix@PAGEOFF
-    adrp    x10, node_count@PAGE
-    add     x10, x10, node_count@PAGEOFF
-    ldr     x10, [x10]
-
-    // Get row in adj matrix
-    mov     x11, #MAX_NODES
-    mul     x12, x0, x11
-    add     x9, x9, x12
-
-    // Copy row to output
-    mov     x11, #0
-neighbor_loop:
-    cmp     x11, x10
-    b.ge    neighbor_done
-    ldrb    w12, [x9, x11]
-    strb    w12, [x19, x11]
-    add     x11, x11, #1
-    b       neighbor_loop
-
-neighbor_done:
-    ldr     x19, [sp, #16]
-    ldp     x29, x30, [sp], #32
+    ldp     x29, x30, [sp], #80
     ret
 
 // Build password from max_clique
@@ -834,57 +649,6 @@ memzero_loop:
     b.ne    memzero_loop
 
 memzero_done:
-    ret
-
-memcpy_bytes:
-    cbz     x2, memcpy_done
-
-memcpy_loop:
-    ldrb    w9, [x1], #1
-    strb    w9, [x0], #1
-    subs    x2, x2, #1
-    b.ne    memcpy_loop
-
-memcpy_done:
-    ret
-
-// Print results
-print_results:
-    stp     x29, x30, [sp, #-16]!
-    mov     x29, sp
-
-    // Print "Part 1: "
-    adrp    x0, part1_msg@PAGE
-    add     x0, x0, part1_msg@PAGEOFF
-    bl      print_string
-
-    // Print part 1 result
-    adrp    x9, part1_result@PAGE
-    add     x9, x9, part1_result@PAGEOFF
-    ldr     x0, [x9]
-    bl      print_number
-
-    // Print newline
-    adrp    x0, newline@PAGE
-    add     x0, x0, newline@PAGEOFF
-    bl      print_string
-
-    // Print "Part 2: "
-    adrp    x0, part2_msg@PAGE
-    add     x0, x0, part2_msg@PAGEOFF
-    bl      print_string
-
-    // Print part 2 result
-    adrp    x0, part2_result@PAGE
-    add     x0, x0, part2_result@PAGEOFF
-    bl      print_string
-
-    // Print newline
-    adrp    x0, newline@PAGE
-    add     x0, x0, newline@PAGEOFF
-    bl      print_string
-
-    ldp     x29, x30, [sp], #16
     ret
 
 // Print null-terminated string
