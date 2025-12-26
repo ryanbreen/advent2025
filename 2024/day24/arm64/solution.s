@@ -286,16 +286,13 @@ parse_input:
     add     x19, x19, file_buffer@PAGEOFF
 
     // Parse initial wire values
+    // Input format: lines of "xyz: V" followed by blank line, then gates
 Lpi_init:
     ldrb    w0, [x19]
     cbz     w0, Lpi_done
     cmp     w0, #'\n'
-    b.ne    Lpi_init_line
-    add     x19, x19, #1
-    ldrb    w0, [x19]
-    cmp     w0, #'\n'
-    b.eq    Lpi_gates
-    b       Lpi_init
+    b.eq    Lpi_gates           // blank line = separator, go to gates
+    b       Lpi_init_line       // otherwise parse wire line
 
 Lpi_init_line:
     mov     x0, x19
@@ -694,9 +691,19 @@ Lfs_loop:
     ldr     w27, [x23, #8]      // in2
     ldr     w28, [x23, #12]     // out
 
+    // Debug: print first gate's wire indices
+    cbnz    x22, 1f              // only for first iteration
+    mov     x0, x24
+    bl      print_number
+    adrp    x1, newline@PAGE
+    add     x1, x1, newline@PAGEOFF
+    mov     x2, #1
+    bl      print_string
+1:
+
     // Rule 1: XOR not x,y should output z
     cmp     w25, #2
-    b.ne    Lfs_rule2
+    b.ne    Lfs_next            // DEBUG: skip to next for non-XOR
 
     mov     x0, x24
     mov     w1, #'x'
