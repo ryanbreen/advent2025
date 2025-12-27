@@ -4,55 +4,123 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.IntStream;
 
+/**
+ * Advent of Code 2023 - Day 5: If You Give A Seed A Fertilizer
+ *
+ * Transforms seed numbers through a series of category mappings to find
+ * the minimum location number.
+ */
 public class Solution {
 
+    /**
+     * Represents a mapping range that transforms source values to destination values.
+     * Values in [srcStart, srcStart + length) map to [dstStart, dstStart + length).
+     *
+     * @param dstStart the start of the destination range
+     * @param srcStart the start of the source range
+     * @param length   the length of both ranges
+     */
     record MapRange(long dstStart, long srcStart, long length) {
+
+        /** Returns the exclusive end of the source range. */
         long srcEnd() {
             return srcStart + length;
         }
+
+        /** Returns the offset to add when mapping source to destination. */
+        long offset() {
+            return dstStart - srcStart;
+        }
+
+        /** Checks if the given value falls within this mapping's source range. */
+        boolean contains(long value) {
+            return value >= srcStart && value < srcEnd();
+        }
     }
 
-    record Range(long start, long end) {}
+    /**
+     * Represents a half-open range [start, end) of values.
+     *
+     * @param start inclusive start of the range
+     * @param end   exclusive end of the range
+     */
+    record Range(long start, long end) {
+
+        /** Returns true if this range is non-empty. */
+        boolean isValid() {
+            return start < end;
+        }
+    }
 
     public static void main(String[] args) throws IOException {
         String text = Files.readString(Path.of("../input.txt"));
         String[] sections = text.strip().split("\n\n");
 
-        // Parse seeds
-        long[] seeds = Arrays.stream(sections[0].split(": ")[1].split("\\s+"))
-                .mapToLong(Long::parseLong)
-                .toArray();
-
-        // Parse maps
-        List<List<MapRange>> maps = new ArrayList<>();
-        for (int i = 1; i < sections.length; i++) {
-            String[] lines = sections[i].strip().split("\n");
-            List<MapRange> ranges = new ArrayList<>();
-            for (int j = 1; j < lines.length; j++) {
-                String[] parts = lines[j].split("\\s+");
-                long dst = Long.parseLong(parts[0]);
-                long src = Long.parseLong(parts[1]);
-                long len = Long.parseLong(parts[2]);
-                ranges.add(new MapRange(dst, src, len));
-            }
-            maps.add(ranges);
-        }
+        long[] seeds = parseSeeds(sections[0]);
+        List<List<MapRange>> maps = parseMaps(sections);
 
         System.out.println("Part 1: " + part1(seeds, maps));
         System.out.println("Part 2: " + part2(seeds, maps));
     }
 
-    static long applyMap(long value, List<MapRange> ranges) {
-        for (MapRange range : ranges) {
-            if (value >= range.srcStart && value < range.srcEnd()) {
-                return range.dstStart + (value - range.srcStart);
-            }
-        }
-        return value;
+    /**
+     * Parses the seed line into an array of seed numbers.
+     */
+    private static long[] parseSeeds(String seedLine) {
+        return Arrays.stream(seedLine.split(": ")[1].split("\\s+"))
+                .mapToLong(Long::parseLong)
+                .toArray();
     }
 
-    static long seedToLocation(long seed, List<List<MapRange>> maps) {
+    /**
+     * Parses all mapping sections into lists of MapRange objects.
+     */
+    private static List<List<MapRange>> parseMaps(String[] sections) {
+        return IntStream.range(1, sections.length)
+                .mapToObj(i -> parseMapSection(sections[i]))
+                .toList();
+    }
+
+    /**
+     * Parses a single map section into a list of MapRange objects.
+     */
+    private static List<MapRange> parseMapSection(String section) {
+        return Arrays.stream(section.strip().split("\n"))
+                .skip(1) // Skip the header line
+                .map(Solution::parseMapRange)
+                .toList();
+    }
+
+    /**
+     * Parses a single line into a MapRange.
+     */
+    private static MapRange parseMapRange(String line) {
+        String[] parts = line.split("\\s+");
+        return new MapRange(
+                Long.parseLong(parts[0]),
+                Long.parseLong(parts[1]),
+                Long.parseLong(parts[2])
+        );
+    }
+
+    /**
+     * Applies a single mapping to a value, returning the mapped result.
+     * If no mapping applies, returns the original value (identity mapping).
+     */
+    private static long applyMap(long value, List<MapRange> ranges) {
+        return ranges.stream()
+                .filter(range -> range.contains(value))
+                .findFirst()
+                .map(range -> range.dstStart() + (value - range.srcStart()))
+                .orElse(value);
+    }
+
+    /**
+     * Transforms a seed through all category mappings to get its final location.
+     */
+    private static long seedToLocation(long seed, List<List<MapRange>> maps) {
         long value = seed;
         for (List<MapRange> mapRanges : maps) {
             value = applyMap(value, mapRanges);
@@ -60,62 +128,72 @@ public class Solution {
         return value;
     }
 
-    static long part1(long[] seeds, List<List<MapRange>> maps) {
-        long min = Long.MAX_VALUE;
-        for (long seed : seeds) {
-            min = Math.min(min, seedToLocation(seed, maps));
-        }
-        return min;
+    /**
+     * Part 1: Find the minimum location for individual seed values.
+     */
+    private static long part1(long[] seeds, List<List<MapRange>> maps) {
+        return Arrays.stream(seeds)
+                .map(seed -> seedToLocation(seed, maps))
+                .min()
+                .orElseThrow();
     }
 
-    static List<Range> applyMapToRanges(List<Range> inputRanges, List<MapRange> mapRanges) {
+    /**
+     * Applies a mapping to a list of ranges, producing transformed ranges.
+     * Handles splitting ranges at mapping boundaries and applying offsets.
+     */
+    private static List<Range> applyMapToRanges(List<Range> inputRanges, List<MapRange> mapRanges) {
         List<Range> result = new ArrayList<>();
 
         for (Range input : inputRanges) {
-            List<Range> remaining = new ArrayList<>();
-            remaining.add(input);
+            List<Range> remaining = new ArrayList<>(List.of(input));
 
             for (MapRange mr : mapRanges) {
                 List<Range> newRemaining = new ArrayList<>();
 
                 for (Range r : remaining) {
-                    // Part before the map range (unmapped)
-                    if (r.start < mr.srcStart) {
-                        newRemaining.add(new Range(r.start, Math.min(r.end, mr.srcStart)));
+                    // Part before the map range (unmapped, stays for next iteration)
+                    Range before = new Range(r.start(), Math.min(r.end(), mr.srcStart()));
+                    if (before.isValid()) {
+                        newRemaining.add(before);
                     }
 
-                    // Part within the map range (mapped)
-                    long overlapStart = Math.max(r.start, mr.srcStart);
-                    long overlapEnd = Math.min(r.end, mr.srcEnd());
+                    // Part within the map range (mapped to result)
+                    long overlapStart = Math.max(r.start(), mr.srcStart());
+                    long overlapEnd = Math.min(r.end(), mr.srcEnd());
                     if (overlapStart < overlapEnd) {
-                        long offset = mr.dstStart - mr.srcStart;
-                        result.add(new Range(overlapStart + offset, overlapEnd + offset));
+                        result.add(new Range(
+                                overlapStart + mr.offset(),
+                                overlapEnd + mr.offset()
+                        ));
                     }
 
-                    // Part after the map range (unmapped)
-                    if (r.end > mr.srcEnd()) {
-                        newRemaining.add(new Range(Math.max(r.start, mr.srcEnd()), r.end));
+                    // Part after the map range (unmapped, stays for next iteration)
+                    Range after = new Range(Math.max(r.start(), mr.srcEnd()), r.end());
+                    if (after.isValid()) {
+                        newRemaining.add(after);
                     }
                 }
 
                 remaining = newRemaining;
             }
 
-            // Any remaining parts are unmapped (identity)
+            // Any remaining parts are unmapped (identity mapping)
             result.addAll(remaining);
         }
 
         return result;
     }
 
-    static long part2(long[] seeds, List<List<MapRange>> maps) {
-        // Convert seeds to ranges
-        List<Range> ranges = new ArrayList<>();
-        for (int i = 0; i < seeds.length; i += 2) {
-            long start = seeds[i];
-            long length = seeds[i + 1];
-            ranges.add(new Range(start, start + length));
-        }
+    /**
+     * Part 2: Seeds are interpreted as pairs (start, length) defining ranges.
+     * Find the minimum location across all seed ranges.
+     */
+    private static long part2(long[] seeds, List<List<MapRange>> maps) {
+        // Convert seed pairs to ranges
+        List<Range> ranges = IntStream.iterate(0, i -> i < seeds.length, i -> i + 2)
+                .mapToObj(i -> new Range(seeds[i], seeds[i] + seeds[i + 1]))
+                .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
 
         // Apply each map to the ranges
         for (List<MapRange> mapRanges : maps) {
@@ -123,10 +201,9 @@ public class Solution {
         }
 
         // Find minimum start of any range
-        long min = Long.MAX_VALUE;
-        for (Range r : ranges) {
-            min = Math.min(min, r.start);
-        }
-        return min;
+        return ranges.stream()
+                .mapToLong(Range::start)
+                .min()
+                .orElseThrow();
     }
 }

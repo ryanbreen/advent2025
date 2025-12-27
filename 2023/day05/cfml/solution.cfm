@@ -2,193 +2,257 @@
 /**
  * Advent of Code 2023 - Day 5: If You Give A Seed A Fertilizer
  * ColdFusion (CFML) Solution
+ *
+ * Algorithm Overview:
+ * - Part 1: Map each seed through a series of conversion maps to find locations
+ * - Part 2: Treat seeds as ranges, split ranges at map boundaries, transform efficiently
+ *
+ * Key Insight: For Part 2, instead of iterating billions of seeds, we track ranges
+ * and split them when they cross map boundaries. This reduces complexity from O(n) to O(maps).
  */
 
-// Read input file
+// Read and parse input file
 inputPath = getDirectoryFromPath(getCurrentTemplatePath()) & "../input.txt";
-inputText = fileRead(inputPath);
+inputContent = fileRead(inputPath);
 
-// Parse the input
-function parseInput(text) {
-    // Normalize line endings and split by double newline
-    var normalizedText = replace(text, chr(13), "", "all");
+/**
+ * Parse the almanac input into seeds and conversion maps.
+ *
+ * @param rawText The raw input text from the puzzle
+ * @return Struct with 'seeds' array and 'maps' array of range definitions
+ */
+function parseAlmanac(required string rawText) {
+    // Normalize line endings (remove carriage returns for cross-platform compatibility)
+    var normalizedText = replace(arguments.rawText, chr(13), "", "all");
+
+    // Split input into sections (separated by blank lines)
     var sections = [];
     var currentSection = "";
     var lines = listToArray(normalizedText, chr(10), true);
 
-    for (var i = 1; i <= arrayLen(lines); i++) {
-        var line = lines[i];
+    for (var line in lines) {
         if (len(trim(line)) == 0) {
+            // Blank line marks end of section
             if (len(trim(currentSection)) > 0) {
                 arrayAppend(sections, trim(currentSection));
                 currentSection = "";
             }
         } else {
-            if (len(currentSection) > 0) {
-                currentSection = currentSection & chr(10) & line;
-            } else {
-                currentSection = line;
-            }
+            // Accumulate lines into current section
+            currentSection = len(currentSection) > 0
+                ? currentSection & chr(10) & line
+                : line;
         }
     }
+    // Don't forget the final section (no trailing blank line)
     if (len(trim(currentSection)) > 0) {
         arrayAppend(sections, trim(currentSection));
     }
 
-    var result = {};
+    var almanac = {
+        seeds: [],
+        maps: []
+    };
 
-    // Parse seeds
+    // Parse seed numbers from first section (format: "seeds: 79 14 55 13")
     var seedLine = sections[1];
-    var seedPart = listRest(seedLine, ": ");
-    result.seeds = [];
-    var seedNumbers = listToArray(trim(seedPart), " ");
-    for (var s in seedNumbers) {
-        if (len(trim(s)) > 0) {
-            arrayAppend(result.seeds, javaCast("long", trim(s)));
+    var seedValues = listToArray(trim(listRest(seedLine, ": ")), " ");
+    for (var seedValue in seedValues) {
+        if (len(trim(seedValue)) > 0) {
+            arrayAppend(almanac.seeds, javaCast("long", trim(seedValue)));
         }
     }
 
-    // Parse maps
-    result.maps = [];
-    for (var i = 2; i <= arrayLen(sections); i++) {
-        var section = sections[i];
-        var sectionLines = listToArray(trim(section), chr(10));
-        var ranges = [];
+    // Parse each conversion map (sections 2 through N)
+    for (var sectionIndex = 2; sectionIndex <= arrayLen(sections); sectionIndex++) {
+        var sectionContent = sections[sectionIndex];
+        var sectionLines = listToArray(trim(sectionContent), chr(10));
+        var mapRanges = [];
 
-        // Skip header line (index 1), process range lines
-        for (var j = 2; j <= arrayLen(sectionLines); j++) {
-            var parts = listToArray(trim(sectionLines[j]), " ");
-            if (arrayLen(parts) == 3) {
-                arrayAppend(ranges, {
-                    dstStart: javaCast("long", trim(parts[1])),
-                    srcStart: javaCast("long", trim(parts[2])),
-                    length: javaCast("long", trim(parts[3]))
+        // Skip header line (e.g., "seed-to-soil map:"), process range definitions
+        for (var lineIndex = 2; lineIndex <= arrayLen(sectionLines); lineIndex++) {
+            var rangeParts = listToArray(trim(sectionLines[lineIndex]), " ");
+            if (arrayLen(rangeParts) == 3) {
+                // Each line: destination_start source_start length
+                arrayAppend(mapRanges, {
+                    destinationStart: javaCast("long", trim(rangeParts[1])),
+                    sourceStart: javaCast("long", trim(rangeParts[2])),
+                    rangeLength: javaCast("long", trim(rangeParts[3]))
                 });
             }
         }
-        arrayAppend(result.maps, ranges);
+        arrayAppend(almanac.maps, mapRanges);
     }
 
-    return result;
+    return almanac;
 }
 
-// Apply a single map to transform a value
-function applyMap(value, ranges) {
-    for (var range in ranges) {
-        if (value >= range.srcStart && value < range.srcStart + range.length) {
-            return range.dstStart + (value - range.srcStart);
+/**
+ * Apply a single conversion map to transform a value.
+ * If the value falls within any range, apply the offset; otherwise return unchanged.
+ *
+ * @param value The value to transform
+ * @param mapRanges Array of range definitions for this map
+ * @return The transformed value
+ */
+function applyConversionMap(required numeric value, required array mapRanges) {
+    for (var range in arguments.mapRanges) {
+        var sourceEnd = range.sourceStart + range.rangeLength;
+        if (arguments.value >= range.sourceStart && arguments.value < sourceEnd) {
+            // Value is within this range - apply the offset
+            return range.destinationStart + (arguments.value - range.sourceStart);
         }
     }
-    return value;
+    // No matching range - value maps to itself
+    return arguments.value;
 }
 
-// Convert seed to location through all maps
-function seedToLocation(seed, maps) {
-    var value = seed;
-    for (var mapRanges in maps) {
-        value = applyMap(value, mapRanges);
+/**
+ * Convert a seed number to its final location through all conversion maps.
+ * Chains through: seed -> soil -> fertilizer -> water -> light -> temperature -> humidity -> location
+ *
+ * @param seedNumber The initial seed number
+ * @param conversionMaps Array of conversion maps to apply in order
+ * @return The final location number
+ */
+function seedToLocation(required numeric seedNumber, required array conversionMaps) {
+    var currentValue = arguments.seedNumber;
+    for (var mapRanges in arguments.conversionMaps) {
+        currentValue = applyConversionMap(currentValue, mapRanges);
     }
-    return value;
+    return currentValue;
 }
 
-// Part 1: Find lowest location for individual seeds
-function part1(seeds, maps) {
-    var minLocation = seedToLocation(seeds[1], maps);
-    for (var i = 2; i <= arrayLen(seeds); i++) {
-        var loc = seedToLocation(seeds[i], maps);
-        if (loc < minLocation) {
-            minLocation = loc;
+/**
+ * Part 1: Find the lowest location for individual seed numbers.
+ * Simply maps each seed through all conversions and finds the minimum.
+ *
+ * @param seedNumbers Array of seed numbers to check
+ * @param conversionMaps Array of conversion maps
+ * @return The minimum location number
+ */
+function solvePart1(required array seedNumbers, required array conversionMaps) {
+    // Start with the first seed's location as our minimum
+    var minimumLocation = seedToLocation(arguments.seedNumbers[1], arguments.conversionMaps);
+
+    // Check remaining seeds for lower locations
+    for (var seedIndex = 2; seedIndex <= arrayLen(arguments.seedNumbers); seedIndex++) {
+        var location = seedToLocation(arguments.seedNumbers[seedIndex], arguments.conversionMaps);
+        if (location < minimumLocation) {
+            minimumLocation = location;
         }
     }
-    return minLocation;
+
+    return minimumLocation;
 }
 
-// Apply map to ranges for Part 2
-function applyMapToRanges(inputRanges, mapRanges) {
-    var result = [];
+/**
+ * Apply a conversion map to a list of value ranges.
+ * Ranges are split at map boundaries and transformed appropriately.
+ *
+ * @param inputRanges Array of {rangeStart, rangeEnd} structs representing value ranges
+ * @param mapRanges Array of range definitions for this conversion map
+ * @return Array of transformed {rangeStart, rangeEnd} structs
+ */
+function applyMapToRanges(required array inputRanges, required array mapRanges) {
+    var transformedRanges = [];
 
-    for (var inputRange in inputRanges) {
-        var remaining = [{ start: inputRange.start, end: inputRange.end }];
+    for (var inputRange in arguments.inputRanges) {
+        // Track portions of this range not yet matched by any map range
+        var unmappedPortions = [{
+            rangeStart: inputRange.rangeStart,
+            rangeEnd: inputRange.rangeEnd
+        }];
 
-        for (var mapRange in mapRanges) {
-            var srcEnd = mapRange.srcStart + mapRange.length;
-            var newRemaining = [];
+        // Process each map range to find overlaps
+        for (var mapRange in arguments.mapRanges) {
+            var sourceEnd = mapRange.sourceStart + mapRange.rangeLength;
+            var newUnmappedPortions = [];
 
-            for (var r in remaining) {
-                // Part before the map range (unmapped)
-                if (r.start < mapRange.srcStart) {
-                    arrayAppend(newRemaining, {
-                        start: r.start,
-                        end: min(r.end, mapRange.srcStart)
+            for (var portion in unmappedPortions) {
+                // Portion before the map range stays unmapped
+                if (portion.rangeStart < mapRange.sourceStart) {
+                    arrayAppend(newUnmappedPortions, {
+                        rangeStart: portion.rangeStart,
+                        rangeEnd: min(portion.rangeEnd, mapRange.sourceStart)
                     });
                 }
 
-                // Part within the map range (mapped)
-                var overlapStart = max(r.start, mapRange.srcStart);
-                var overlapEnd = min(r.end, srcEnd);
+                // Overlapping portion gets transformed
+                var overlapStart = max(portion.rangeStart, mapRange.sourceStart);
+                var overlapEnd = min(portion.rangeEnd, sourceEnd);
                 if (overlapStart < overlapEnd) {
-                    var offset = mapRange.dstStart - mapRange.srcStart;
-                    arrayAppend(result, {
-                        start: overlapStart + offset,
-                        end: overlapEnd + offset
+                    var offset = mapRange.destinationStart - mapRange.sourceStart;
+                    arrayAppend(transformedRanges, {
+                        rangeStart: overlapStart + offset,
+                        rangeEnd: overlapEnd + offset
                     });
                 }
 
-                // Part after the map range (unmapped)
-                if (r.end > srcEnd) {
-                    arrayAppend(newRemaining, {
-                        start: max(r.start, srcEnd),
-                        end: r.end
+                // Portion after the map range stays unmapped
+                if (portion.rangeEnd > sourceEnd) {
+                    arrayAppend(newUnmappedPortions, {
+                        rangeStart: max(portion.rangeStart, sourceEnd),
+                        rangeEnd: portion.rangeEnd
                     });
                 }
             }
 
-            remaining = newRemaining;
+            unmappedPortions = newUnmappedPortions;
         }
 
-        // Any remaining parts are unmapped (identity)
-        for (var rem in remaining) {
-            arrayAppend(result, rem);
+        // Unmapped portions pass through unchanged (identity mapping)
+        for (var remainingPortion in unmappedPortions) {
+            arrayAppend(transformedRanges, remainingPortion);
         }
     }
 
-    return result;
+    return transformedRanges;
 }
 
-// Part 2: Find lowest location for seed ranges
-function part2(seeds, maps) {
-    // Convert seeds to ranges: pairs of (start, start + length)
-    var ranges = [];
-    for (var i = 1; i <= arrayLen(seeds); i += 2) {
-        var rangeStart = seeds[i];
-        var rangeLength = seeds[i + 1];
-        arrayAppend(ranges, {
-            start: rangeStart,
-            end: rangeStart + rangeLength
+/**
+ * Part 2: Find the lowest location when seeds are interpreted as ranges.
+ * Seeds are parsed as pairs: (start, length) defining ranges of seed numbers.
+ *
+ * @param seedNumbers Array of seed numbers (pairs: start, length, start, length, ...)
+ * @param conversionMaps Array of conversion maps
+ * @return The minimum location number across all seed ranges
+ */
+function solvePart2(required array seedNumbers, required array conversionMaps) {
+    // Convert seed pairs into ranges: each pair is (start, length)
+    var seedRanges = [];
+    for (var pairIndex = 1; pairIndex <= arrayLen(arguments.seedNumbers); pairIndex += 2) {
+        var rangeStart = arguments.seedNumbers[pairIndex];
+        var rangeLength = arguments.seedNumbers[pairIndex + 1];
+        arrayAppend(seedRanges, {
+            rangeStart: rangeStart,
+            rangeEnd: rangeStart + rangeLength
         });
     }
 
-    // Apply each map to the ranges
-    for (var mapRanges in maps) {
-        ranges = applyMapToRanges(ranges, mapRanges);
+    // Apply each conversion map to transform the ranges
+    var currentRanges = seedRanges;
+    for (var mapRanges in arguments.conversionMaps) {
+        currentRanges = applyMapToRanges(currentRanges, mapRanges);
     }
 
-    // Find minimum start of any range
-    var minStart = ranges[1].start;
-    for (var i = 2; i <= arrayLen(ranges); i++) {
-        if (ranges[i].start < minStart) {
-            minStart = ranges[i].start;
+    // Find the minimum starting point among all final ranges
+    var minimumLocation = currentRanges[1].rangeStart;
+    for (var rangeIndex = 2; rangeIndex <= arrayLen(currentRanges); rangeIndex++) {
+        if (currentRanges[rangeIndex].rangeStart < minimumLocation) {
+            minimumLocation = currentRanges[rangeIndex].rangeStart;
         }
     }
-    return minStart;
+
+    return minimumLocation;
 }
 
 // Main execution
-parsed = parseInput(inputText);
+almanac = parseAlmanac(inputContent);
 
-result1 = part1(parsed.seeds, parsed.maps);
-result2 = part2(parsed.seeds, parsed.maps);
+part1Result = solvePart1(almanac.seeds, almanac.maps);
+part2Result = solvePart2(almanac.seeds, almanac.maps);
 
-writeOutput("Part 1: " & result1 & chr(10));
-writeOutput("Part 2: " & result2 & chr(10));
+writeOutput("Part 1: " & part1Result & chr(10));
+writeOutput("Part 2: " & part2Result & chr(10));
 </cfscript>

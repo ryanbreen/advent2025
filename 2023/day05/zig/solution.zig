@@ -1,43 +1,80 @@
 const std = @import("std");
 
+/// Represents a mapping range from source to destination in the almanac.
+/// Values in [src_start, src_start + length) map to [dst_start, dst_start + length).
 const Range = struct {
     dst_start: u64,
     src_start: u64,
     length: u64,
+
+    /// Returns the end of the source range (exclusive).
+    pub inline fn srcEnd(self: Range) u64 {
+        return self.src_start + self.length;
+    }
+
+    /// Attempts to map a value through this range.
+    /// Returns the mapped value if within range, null otherwise.
+    pub inline fn mapValue(self: Range, value: u64) ?u64 {
+        if (value >= self.src_start and value < self.srcEnd()) {
+            return self.dst_start + (value - self.src_start);
+        }
+        return null;
+    }
 };
 
+/// Represents a contiguous range of seed values [start, end).
 const SeedRange = struct {
     start: u64,
     end: u64,
+
+    /// Creates a new seed range from start and length.
+    pub inline fn fromStartAndLength(start: u64, length: u64) SeedRange {
+        return .{ .start = start, .end = start + length };
+    }
+
+    /// Returns true if this range is non-empty.
+    pub inline fn isValid(self: SeedRange) bool {
+        return self.start < self.end;
+    }
 };
 
-fn parseInput(allocator: std.mem.Allocator, text: []const u8) !struct {
+/// Parsed input data containing seeds and mapping chains.
+const ParsedInput = struct {
     seeds: []u64,
     maps: [][]Range,
-} {
+    allocator: std.mem.Allocator,
+
+    /// Frees all allocated memory.
+    pub fn deinit(self: *ParsedInput) void {
+        self.allocator.free(self.seeds);
+        for (self.maps) |m| {
+            self.allocator.free(m);
+        }
+        self.allocator.free(self.maps);
+    }
+};
+
+/// Parses the almanac input text into seeds and mapping chains.
+fn parseInput(allocator: std.mem.Allocator, text: []const u8) !ParsedInput {
     var sections = std.mem.splitSequence(u8, text, "\n\n");
 
-    // Parse seeds
+    // Parse seeds line: "seeds: 79 14 55 13"
     const seeds_section = sections.next() orelse return error.InvalidInput;
-    var seeds_line_iter = std.mem.splitSequence(u8, seeds_section, ": ");
-    _ = seeds_line_iter.next(); // Skip "seeds" label
-    const seeds_str = seeds_line_iter.next() orelse return error.InvalidInput;
+    const colon_pos = std.mem.indexOf(u8, seeds_section, ": ") orelse return error.InvalidInput;
+    const seeds_str = seeds_section[colon_pos + 2 ..];
 
     var seeds_list: std.ArrayListUnmanaged(u64) = .empty;
     defer seeds_list.deinit(allocator);
 
     var seeds_iter = std.mem.tokenizeAny(u8, seeds_str, " \n");
     while (seeds_iter.next()) |seed_str| {
-        const seed = try std.fmt.parseInt(u64, seed_str, 10);
-        try seeds_list.append(allocator, seed);
+        try seeds_list.append(allocator, try std.fmt.parseInt(u64, seed_str, 10));
     }
 
-    // Parse maps
+    // Parse mapping sections
     var maps_list: std.ArrayListUnmanaged([]Range) = .empty;
     errdefer {
-        for (maps_list.items) |m| {
-            allocator.free(m);
-        }
+        for (maps_list.items) |m| allocator.free(m);
         maps_list.deinit(allocator);
     }
 
@@ -45,7 +82,7 @@ fn parseInput(allocator: std.mem.Allocator, text: []const u8) !struct {
         if (section.len == 0) continue;
 
         var lines = std.mem.splitScalar(u8, section, '\n');
-        _ = lines.next(); // Skip header
+        _ = lines.next(); // Skip header line (e.g., "seed-to-soil map:")
 
         var ranges_list: std.ArrayListUnmanaged(Range) = .empty;
         defer ranges_list.deinit(allocator);
@@ -53,7 +90,7 @@ fn parseInput(allocator: std.mem.Allocator, text: []const u8) !struct {
         while (lines.next()) |line| {
             if (line.len == 0) continue;
 
-            var nums = std.mem.tokenizeAny(u8, line, " ");
+            var nums = std.mem.tokenizeScalar(u8, line, ' ');
             const dst_start = try std.fmt.parseInt(u64, nums.next() orelse continue, 10);
             const src_start = try std.fmt.parseInt(u64, nums.next() orelse continue, 10);
             const length = try std.fmt.parseInt(u64, nums.next() orelse continue, 10);
@@ -71,18 +108,22 @@ fn parseInput(allocator: std.mem.Allocator, text: []const u8) !struct {
     return .{
         .seeds = try seeds_list.toOwnedSlice(allocator),
         .maps = try maps_list.toOwnedSlice(allocator),
+        .allocator = allocator,
     };
 }
 
+/// Applies a single mapping layer to a value.
+/// Returns the mapped value, or the original if no range matches.
 fn applyMap(value: u64, ranges: []const Range) u64 {
     for (ranges) |r| {
-        if (value >= r.src_start and value < r.src_start + r.length) {
-            return r.dst_start + (value - r.src_start);
+        if (r.mapValue(value)) |mapped| {
+            return mapped;
         }
     }
     return value;
 }
 
+/// Traces a seed through all mapping layers to get its final location.
 fn seedToLocation(seed: u64, maps: []const []Range) u64 {
     var value = seed;
     for (maps) |map_ranges| {
@@ -91,43 +132,46 @@ fn seedToLocation(seed: u64, maps: []const []Range) u64 {
     return value;
 }
 
+/// Part 1: Find the lowest location for individual seed values.
 fn part1(seeds: []const u64, maps: []const []Range) u64 {
     var min_loc: u64 = std.math.maxInt(u64);
     for (seeds) |seed| {
-        const loc = seedToLocation(seed, maps);
-        if (loc < min_loc) {
-            min_loc = loc;
-        }
+        min_loc = @min(min_loc, seedToLocation(seed, maps));
     }
     return min_loc;
 }
 
-fn applyMapToRanges(allocator: std.mem.Allocator, input_ranges: []const SeedRange, map_ranges: []const Range) ![]SeedRange {
+/// Applies a mapping layer to a set of seed ranges, splitting and transforming as needed.
+fn applyMapToRanges(
+    allocator: std.mem.Allocator,
+    input_ranges: []const SeedRange,
+    map_ranges: []const Range,
+) ![]SeedRange {
     var result: std.ArrayListUnmanaged(SeedRange) = .empty;
     errdefer result.deinit(allocator);
 
     for (input_ranges) |in_range| {
         var remaining: std.ArrayListUnmanaged(SeedRange) = .empty;
         defer remaining.deinit(allocator);
-        try remaining.append(allocator, .{ .start = in_range.start, .end = in_range.end });
+        try remaining.append(allocator, in_range);
 
         for (map_ranges) |r| {
-            const src_end = r.src_start + r.length;
             var new_remaining: std.ArrayListUnmanaged(SeedRange) = .empty;
             defer new_remaining.deinit(allocator);
 
             for (remaining.items) |rem| {
-                // Part before the map range (unmapped)
+                // Part before the map range (stays unmapped for now)
                 if (rem.start < r.src_start) {
-                    try new_remaining.append(allocator, .{
+                    const before = SeedRange{
                         .start = rem.start,
                         .end = @min(rem.end, r.src_start),
-                    });
+                    };
+                    if (before.isValid()) try new_remaining.append(allocator, before);
                 }
 
-                // Part within the map range (mapped)
+                // Overlapping part (gets mapped)
                 const overlap_start = @max(rem.start, r.src_start);
-                const overlap_end = @min(rem.end, src_end);
+                const overlap_end = @min(rem.end, r.srcEnd());
                 if (overlap_start < overlap_end) {
                     const offset = r.dst_start -% r.src_start;
                     try result.append(allocator, .{
@@ -136,12 +180,13 @@ fn applyMapToRanges(allocator: std.mem.Allocator, input_ranges: []const SeedRang
                     });
                 }
 
-                // Part after the map range (unmapped)
-                if (rem.end > src_end) {
-                    try new_remaining.append(allocator, .{
-                        .start = @max(rem.start, src_end),
+                // Part after the map range (stays unmapped for now)
+                if (rem.end > r.srcEnd()) {
+                    const after = SeedRange{
+                        .start = @max(rem.start, r.srcEnd()),
                         .end = rem.end,
-                    });
+                    };
+                    if (after.isValid()) try new_remaining.append(allocator, after);
                 }
             }
 
@@ -149,27 +194,26 @@ fn applyMapToRanges(allocator: std.mem.Allocator, input_ranges: []const SeedRang
             try remaining.appendSlice(allocator, new_remaining.items);
         }
 
-        // Any remaining parts are unmapped (identity)
+        // Any remaining parts pass through unmapped (identity)
         try result.appendSlice(allocator, remaining.items);
     }
 
-    return result.toOwnedSlice(allocator);
+    return try result.toOwnedSlice(allocator);
 }
 
+/// Part 2: Find the lowest location treating seed pairs as ranges.
 fn part2(allocator: std.mem.Allocator, seeds: []const u64, maps: []const []Range) !u64 {
-    // Convert seeds to ranges
-    var ranges: std.ArrayListUnmanaged(SeedRange) = .empty;
-    defer ranges.deinit(allocator);
+    // Convert seed pairs to ranges
+    var initial_ranges: std.ArrayListUnmanaged(SeedRange) = .empty;
+    defer initial_ranges.deinit(allocator);
 
     var i: usize = 0;
-    while (i < seeds.len) : (i += 2) {
-        const start = seeds[i];
-        const length = seeds[i + 1];
-        try ranges.append(allocator, .{ .start = start, .end = start + length });
+    while (i + 1 < seeds.len) : (i += 2) {
+        try initial_ranges.append(allocator, SeedRange.fromStartAndLength(seeds[i], seeds[i + 1]));
     }
 
-    // Apply each map to the ranges
-    var current_ranges = try ranges.toOwnedSlice(allocator);
+    // Apply each mapping layer successively
+    var current_ranges = try initial_ranges.toOwnedSlice(allocator);
     defer allocator.free(current_ranges);
 
     for (maps) |map_ranges| {
@@ -178,12 +222,10 @@ fn part2(allocator: std.mem.Allocator, seeds: []const u64, maps: []const []Range
         current_ranges = new_ranges;
     }
 
-    // Find minimum start of any range
+    // Find minimum start across all resulting ranges
     var min_loc: u64 = std.math.maxInt(u64);
     for (current_ranges) |r| {
-        if (r.start < min_loc) {
-            min_loc = r.start;
-        }
+        min_loc = @min(min_loc, r.start);
     }
 
     return min_loc;
@@ -194,21 +236,14 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    // Read input
+    // Read and parse input
     const input = try std.fs.cwd().readFileAlloc(allocator, "../input.txt", 1024 * 1024);
     defer allocator.free(input);
 
-    // Parse input
-    const parsed = try parseInput(allocator, input);
-    defer {
-        allocator.free(parsed.seeds);
-        for (parsed.maps) |m| {
-            allocator.free(m);
-        }
-        allocator.free(parsed.maps);
-    }
+    var parsed = try parseInput(allocator, input);
+    defer parsed.deinit();
 
-    // Solve both parts
+    // Solve and output results
     const result1 = part1(parsed.seeds, parsed.maps);
     const result2 = try part2(allocator, parsed.seeds, parsed.maps);
 

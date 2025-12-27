@@ -105,33 +105,30 @@ The problem looks like it requires iterating billions of seeds, but the range-ba
 - **ColdFusion:** JVM startup dominates
 
 ### Bash
-The range-based Part 2 is extremely slow in pure bash due to:
-- No native 64-bit arithmetic
-- Expensive string/array operations for range tracking
-- Nested loops with eval for dynamic variable access
+After tuning to use associative arrays instead of eval-based dynamic variables, the Bash implementation now runs at a reasonable speed (~350ms), though still slower than compiled languages.
 
 ## Benchmarks
 
 | Language    | Runtime (ms) | Memory (MB) |
 |-------------|--------------|-------------|
-| C           | 5.7          | 1.9         |
-| ARM64 asm   | 6.3          | 1.9         |
-| C++         | 6.3          | 1.9         |
-| Rust        | 7.3          | 1.9         |
-| Perl        | 19.9         | 6.1         |
-| Python      | 31.1         | 15.8        |
-| Lisp        | 31.2         | 43.4        |
-| Zig         | 33.5         | 2.1         |
-| Go          | 51.5         | 27.9        |
-| Java        | 53.0         | 48.2        |
-| PHP         | 54.9         | 25.9        |
-| Node.js     | 58.5         | 45.8        |
-| Ruby        | 61.0         | 28.1        |
-| Clojure     | 443.5        | 139.4       |
-| ColdFusion  | 2,651.6      | 1,131.8     |
-| Bash        | N/A          | N/A         |
+| ARM64 asm   | 5.5          | 1.9         |
+| Rust        | 6.5          | 1.9         |
+| C++         | 6.6          | 1.9         |
+| C           | 6.8          | 1.9         |
+| Zig         | 7.0          | 1.9         |
+| Perl        | 20.5         | 6.3         |
+| ColdFusion  | 26.8         | 4.9         |
+| Lisp        | 30.5         | 42.2        |
+| Python      | 38.9         | 18.0        |
+| Node.js     | 57.8         | 46.3        |
+| PHP         | 65.4         | 26.1        |
+| Go          | 70.4         | 27.3        |
+| Ruby        | 77.0         | 28.2        |
+| Java        | 79.1         | 55.9        |
+| Bash        | 347.8        | 7.2         |
+| Clojure     | 453.3        | 136.4       |
 
-*Note: Bash is excluded from benchmarks as the range-based Part 2 algorithm is prohibitively slow in pure shell scripting.*
+*Note: ColdFusion benchmark measured via HTTP request to running server; actual startup time is higher.*
 
 ## Answers
 
