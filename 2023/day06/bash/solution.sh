@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # Day 6: Wait For It
 # Read input from ../input.txt
@@ -12,9 +13,9 @@ mapfile -t lines < "$input_file"
 time_line="${lines[0]}"
 dist_line="${lines[1]}"
 
-# Extract numbers from lines
-read -ra times <<< "$(echo "$time_line" | sed 's/Time://' | tr -s ' ')"
-read -ra distances <<< "$(echo "$dist_line" | sed 's/Distance://' | tr -s ' ')"
+# Extract numbers from lines using parameter expansion
+read -ra times <<< "$(tr -s ' ' <<< "${time_line#Time:}")"
+read -ra distances <<< "$(tr -s ' ' <<< "${dist_line#Distance:}")"
 
 # Function to count ways to win using quadratic formula
 count_ways_to_win() {
@@ -26,37 +27,42 @@ count_ways_to_win() {
     # Roots: t = (time ± sqrt(time^2 - 4*record)) / 2
 
     # Calculate discriminant: time^2 - 4*record
-    local discriminant=$(echo "$time * $time - 4 * $record" | bc)
+    local discriminant
+    discriminant=$(bc <<< "$time * $time - 4 * $record")
 
     # If discriminant <= 0, no solutions
-    if [ "$(echo "$discriminant <= 0" | bc)" -eq 1 ]; then
+    if [ "$(bc <<< "$discriminant <= 0")" -eq 1 ]; then
         echo 0
         return
     fi
 
     # Calculate sqrt of discriminant using bc
-    local sqrt_d=$(echo "scale=20; sqrt($discriminant)" | bc)
+    local sqrt_d
+    sqrt_d=$(bc <<< "scale=20; sqrt($discriminant)")
 
     # Calculate roots
-    local t_low=$(echo "scale=20; ($time - $sqrt_d) / 2" | bc)
-    local t_high=$(echo "scale=20; ($time + $sqrt_d) / 2" | bc)
+    local t_low t_high
+    t_low=$(bc <<< "scale=20; ($time - $sqrt_d) / 2")
+    t_high=$(bc <<< "scale=20; ($time + $sqrt_d) / 2")
 
     # We need integer values strictly between the roots
     # first = floor(t_low) + 1
     # last = ceil(t_high) - 1
 
     # floor(t_low): truncate toward negative infinity
-    local floor_low=$(echo "scale=0; $t_low / 1" | bc)
+    local floor_low
+    floor_low=$(bc <<< "scale=0; $t_low / 1")
     # If t_low is negative and has a fractional part, we need to subtract 1
-    if [ "$(echo "$t_low < 0 && $t_low != $floor_low" | bc)" -eq 1 ]; then
+    if [ "$(bc <<< "$t_low < 0 && $t_low != $floor_low")" -eq 1 ]; then
         floor_low=$((floor_low - 1))
     fi
     local first=$((floor_low + 1))
 
     # ceil(t_high): if t_high has fractional part, round up
-    local trunc_high=$(echo "scale=0; $t_high / 1" | bc)
+    local trunc_high
+    trunc_high=$(bc <<< "scale=0; $t_high / 1")
     local ceil_high
-    if [ "$(echo "$t_high > $trunc_high" | bc)" -eq 1 ]; then
+    if [ "$(bc <<< "$t_high > $trunc_high")" -eq 1 ]; then
         ceil_high=$((trunc_high + 1))
     else
         ceil_high=$trunc_high

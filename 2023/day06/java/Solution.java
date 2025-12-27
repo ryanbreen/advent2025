@@ -3,30 +3,29 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Solution {
 
-    private static List<long[]> parseRaces(String[] lines) {
-        List<Long> times = parseNumbers(lines[0]);
-        List<Long> distances = parseNumbers(lines[1]);
+    private record Race(long time, long record) {}
 
-        List<long[]> races = new ArrayList<>();
+    private static final Pattern NUMBER_PATTERN = Pattern.compile("\\d+");
+
+    private static List<Race> parseRaces(List<String> lines) {
+        var times = parseNumbers(lines.get(0));
+        var distances = parseNumbers(lines.get(1));
+
+        var races = new ArrayList<Race>();
         for (int i = 0; i < times.size(); i++) {
-            races.add(new long[]{times.get(i), distances.get(i)});
+            races.add(new Race(times.get(i), distances.get(i)));
         }
         return races;
     }
 
     private static List<Long> parseNumbers(String line) {
-        List<Long> numbers = new ArrayList<>();
-        Pattern pattern = Pattern.compile("\\d+");
-        Matcher matcher = pattern.matcher(line);
-        while (matcher.find()) {
-            numbers.add(Long.parseLong(matcher.group()));
-        }
-        return numbers;
+        return NUMBER_PATTERN.matcher(line).results()
+            .map(m -> Long.parseLong(m.group()))
+            .toList();
     }
 
     private static long countWaysToWin(long time, long record) {
@@ -57,22 +56,19 @@ public class Solution {
         return last - first + 1;
     }
 
-    private static long part1(List<long[]> races) {
-        long result = 1;
-        for (long[] race : races) {
-            long ways = countWaysToWin(race[0], race[1]);
-            result *= ways;
-        }
-        return result;
+    private static long part1(List<Race> races) {
+        return races.stream()
+            .mapToLong(r -> countWaysToWin(r.time(), r.record()))
+            .reduce(1, (a, b) -> a * b);
     }
 
-    private static long part2(List<long[]> races) {
-        StringBuilder timeStr = new StringBuilder();
-        StringBuilder recordStr = new StringBuilder();
+    private static long part2(List<Race> races) {
+        var timeStr = new StringBuilder();
+        var recordStr = new StringBuilder();
 
-        for (long[] race : races) {
-            timeStr.append(race[0]);
-            recordStr.append(race[1]);
+        for (Race race : races) {
+            timeStr.append(race.time());
+            recordStr.append(race.record());
         }
 
         long time = Long.parseLong(timeStr.toString());
@@ -82,10 +78,9 @@ public class Solution {
     }
 
     public static void main(String[] args) throws IOException {
-        String content = Files.readString(Path.of("../input.txt")).trim();
-        String[] lines = content.split("\n");
+        List<String> lines = Files.readAllLines(Path.of("../input.txt"));
 
-        List<long[]> races = parseRaces(lines);
+        List<Race> races = parseRaces(lines);
 
         System.out.println("Part 1: " + part1(races));
         System.out.println("Part 2: " + part2(races));

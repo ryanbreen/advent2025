@@ -1,9 +1,10 @@
 <?php
+declare(strict_types=1);
 
 $input = trim(file_get_contents(__DIR__ . '/../input.txt'));
 $lines = explode("\n", $input);
 
-function parse_races($lines) {
+function parse_races(array $lines): array {
     preg_match_all('/\d+/', $lines[0], $times);
     preg_match_all('/\d+/', $lines[1], $distances);
     $times = array_map('intval', $times[0]);
@@ -11,7 +12,7 @@ function parse_races($lines) {
     return array_map(null, $times, $distances);
 }
 
-function count_ways_to_win($time, $record) {
+function count_ways_to_win(int $time, int $record): int {
     /**
      * Count the number of ways to beat the record.
      *
@@ -30,8 +31,8 @@ function count_ways_to_win($time, $record) {
     $t_high = ($time + $sqrt_d) / 2;
 
     // We need integer values strictly between the roots
-    $first = floor($t_low) + 1;
-    $last = ceil($t_high) - 1;
+    $first = (int)floor($t_low) + 1;
+    $last = (int)ceil($t_high) - 1;
 
     if ($last < $first) {
         return 0;
@@ -39,28 +40,15 @@ function count_ways_to_win($time, $record) {
     return $last - $first + 1;
 }
 
-function part1($lines) {
+function part1(array $lines): int {
     $races = parse_races($lines);
-    $result = 1;
-    foreach ($races as $race) {
-        list($time, $record) = $race;
-        $ways = count_ways_to_win($time, $record);
-        $result *= $ways;
-    }
-    return $result;
+    return array_reduce($races, fn(int $acc, array $r): int => $acc * count_ways_to_win($r[0], $r[1]), 1);
 }
 
-function part2($lines) {
-    $races = parse_races($lines);
-    $time_str = '';
-    $record_str = '';
-    foreach ($races as $race) {
-        list($t, $d) = $race;
-        $time_str .= $t;
-        $record_str .= $d;
-    }
-    $time = (int)$time_str;
-    $record = (int)$record_str;
+function part2(array $lines): int {
+    // Parse by removing all non-digit characters and concatenating
+    $time = (int)preg_replace('/\D/', '', $lines[0]);
+    $record = (int)preg_replace('/\D/', '', $lines[1]);
     return count_ways_to_win($time, $record);
 }
 

@@ -2,6 +2,7 @@
 use strict;
 use warnings;
 use POSIX qw(floor ceil);
+use List::Util qw(product);
 
 # Read input
 my $input_file = '../input.txt';
@@ -11,6 +12,7 @@ close($fh);
 chomp(@lines);
 
 sub parse_races {
+    my @lines = @_;
     my ($time_line, $dist_line) = @lines;
 
     my @times = ($time_line =~ /\d+/g);
@@ -47,20 +49,13 @@ sub count_ways_to_win {
 }
 
 sub part1 {
-    my @races = parse_races();
-    my $result = 1;
-
-    for my $race (@races) {
-        my ($time, $record) = @$race;
-        my $ways = count_ways_to_win($time, $record);
-        $result *= $ways;
-    }
-
-    return $result;
+    my @races = parse_races(@lines);
+    my @ways = map { count_ways_to_win(@$_) } @races;
+    return product(@ways);
 }
 
 sub part2 {
-    my @races = parse_races();
+    my @races = parse_races(@lines);
 
     # Concatenate all times and distances into single numbers
     my $time = join('', map { $_->[0] } @races);

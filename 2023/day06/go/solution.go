@@ -15,6 +15,7 @@ func parseRaces(lines []string) ([]int, []int) {
 	times := make([]int, len(timeParts))
 	distances := make([]int, len(distParts))
 
+	// Parse errors ignored: AoC input is guaranteed well-formed
 	for i, t := range timeParts {
 		times[i], _ = strconv.Atoi(t)
 	}
@@ -31,17 +32,17 @@ func countWaysToWin(time, record int) int {
 	// Solving: -t^2 + time*t - record > 0
 	// Roots: t = (time +/- sqrt(time^2 - 4*record)) / 2
 
-	timeF := float64(time)
-	recordF := float64(record)
+	t := float64(time)
+	r := float64(record)
 
-	discriminant := timeF*timeF - 4*recordF
+	discriminant := t*t - 4*r
 	if discriminant <= 0 {
 		return 0
 	}
 
 	sqrtD := math.Sqrt(discriminant)
-	tLow := (timeF - sqrtD) / 2
-	tHigh := (timeF + sqrtD) / 2
+	tLow := (t - sqrtD) / 2
+	tHigh := (t + sqrtD) / 2
 
 	// We need integer values strictly between the roots
 	first := int(math.Floor(tLow)) + 1
@@ -55,8 +56,8 @@ func countWaysToWin(time, record int) int {
 
 func part1(times, distances []int) int {
 	result := 1
-	for i := 0; i < len(times); i++ {
-		ways := countWaysToWin(times[i], distances[i])
+	for i, t := range times {
+		ways := countWaysToWin(t, distances[i])
 		result *= ways
 	}
 	return result
@@ -72,6 +73,7 @@ func part2(times, distances []int) int {
 		distStr.WriteString(strconv.Itoa(d))
 	}
 
+	// Parse errors ignored: concatenated digits are guaranteed valid
 	time, _ := strconv.Atoi(timeStr.String())
 	dist, _ := strconv.Atoi(distStr.String())
 

@@ -37,11 +37,7 @@ def count_ways_to_win(time, record):
 
 def part1():
     races = parse_races()
-    result = 1
-    for time, record in races:
-        ways = count_ways_to_win(time, record)
-        result *= ways
-    return result
+    return math.prod(count_ways_to_win(time, record) for time, record in races)
 
 
 def part2():

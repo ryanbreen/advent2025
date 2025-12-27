@@ -33,17 +33,17 @@ fn parse_races(input: &str) -> Vec<(u64, u64)> {
     let lines: Vec<&str> = input.lines().collect();
 
     let times: Vec<u64> = lines[0]
-        .split(':')
-        .nth(1)
+        .split_once(':')
         .unwrap()
+        .1
         .split_whitespace()
         .map(|s| s.parse().unwrap())
         .collect();
 
     let distances: Vec<u64> = lines[1]
-        .split(':')
-        .nth(1)
+        .split_once(':')
         .unwrap()
+        .1
         .split_whitespace()
         .map(|s| s.parse().unwrap())
         .collect();
@@ -60,15 +60,9 @@ fn part1(input: &str) -> u64 {
 }
 
 fn part2(input: &str) -> u64 {
-    let races = parse_races(input);
-
-    // Concatenate all times and distances into single numbers
-    let time_str: String = races.iter().map(|(t, _)| t.to_string()).collect();
-    let distance_str: String = races.iter().map(|(_, d)| d.to_string()).collect();
-
-    let time: u64 = time_str.parse().unwrap();
-    let record: u64 = distance_str.parse().unwrap();
-
+    let lines: Vec<&str> = input.lines().collect();
+    let time: u64 = lines[0].chars().filter(|c| c.is_ascii_digit()).collect::<String>().parse().unwrap();
+    let record: u64 = lines[1].chars().filter(|c| c.is_ascii_digit()).collect::<String>().parse().unwrap();
     count_ways_to_win(time, record)
 }
 
