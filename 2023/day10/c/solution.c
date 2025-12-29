@@ -7,6 +7,18 @@
 #define MAX_COLS 256
 #define QUEUE_SIZE (MAX_ROWS * MAX_COLS)
 
+/* Direction indices for DR/DC arrays */
+#define DIR_NORTH 0
+#define DIR_SOUTH 1
+#define DIR_WEST  2
+#define DIR_EAST  3
+
+/* Connection bitmasks for pipe types */
+#define CONN_NORTH (1 << DIR_NORTH)
+#define CONN_SOUTH (1 << DIR_SOUTH)
+#define CONN_WEST  (1 << DIR_WEST)
+#define CONN_EAST  (1 << DIR_EAST)
+
 static char grid[MAX_ROWS][MAX_COLS];
 static int distances[MAX_ROWS][MAX_COLS];
 static bool in_loop[MAX_ROWS][MAX_COLS];
@@ -24,29 +36,25 @@ static const int DR[] = {-1, 1, 0, 0};
 static const int DC[] = {0, 0, -1, 1};
 
 /* Get the directions a pipe connects to.
- * Returns a bitmask: bit 0 = N, bit 1 = S, bit 2 = W, bit 3 = E
+ * Returns a bitmask using CONN_* constants.
  */
 static int get_pipe_connections(char ch) {
     switch (ch) {
-        case '|': return (1 << 0) | (1 << 1);  /* N, S */
-        case '-': return (1 << 2) | (1 << 3);  /* W, E */
-        case 'L': return (1 << 0) | (1 << 3);  /* N, E */
-        case 'J': return (1 << 0) | (1 << 2);  /* N, W */
-        case '7': return (1 << 1) | (1 << 2);  /* S, W */
-        case 'F': return (1 << 1) | (1 << 3);  /* S, E */
+        case '|': return CONN_NORTH | CONN_SOUTH;
+        case '-': return CONN_WEST  | CONN_EAST;
+        case 'L': return CONN_NORTH | CONN_EAST;
+        case 'J': return CONN_NORTH | CONN_WEST;
+        case '7': return CONN_SOUTH | CONN_WEST;
+        case 'F': return CONN_SOUTH | CONN_EAST;
         default: return 0;
     }
 }
 
-/* Get the opposite direction index */
+/* Get the opposite direction index.
+ * Uses XOR trick: N(0)^1=S(1), S(1)^1=N(0), W(2)^1=E(3), E(3)^1=W(2)
+ */
 static int opposite_dir(int dir) {
-    switch (dir) {
-        case 0: return 1;  /* N -> S */
-        case 1: return 0;  /* S -> N */
-        case 2: return 3;  /* W -> E */
-        case 3: return 2;  /* E -> W */
-        default: return -1;
-    }
+    return dir ^ 1;
 }
 
 /* Check if a pipe connects in a given direction */
@@ -74,7 +82,7 @@ static Pos find_start(void) {
     return p;
 }
 
-/* Determine what pipe S actually represents */
+/* Determine what pipe S actually represents based on its neighbors */
 static char determine_start_pipe(Pos start) {
     int connections = 0;
 
@@ -82,7 +90,7 @@ static char determine_start_pipe(Pos start) {
         int nr = start.r + DR[dir];
         int nc = start.c + DC[dir];
 
-        if (valid_pos(nr, nc) && in_loop[nr][nc]) {
+        if (valid_pos(nr, nc)) {
             char adj = grid[nr][nc];
             int opp = opposite_dir(dir);
             if (connects_in_dir(adj, opp)) {
@@ -93,18 +101,23 @@ static char determine_start_pipe(Pos start) {
 
     /* Match connections to a pipe type */
     switch (connections) {
-        case (1 << 0) | (1 << 1): return '|';
-        case (1 << 2) | (1 << 3): return '-';
-        case (1 << 0) | (1 << 3): return 'L';
-        case (1 << 0) | (1 << 2): return 'J';
-        case (1 << 1) | (1 << 2): return '7';
-        case (1 << 1) | (1 << 3): return 'F';
+        case CONN_NORTH | CONN_SOUTH: return '|';
+        case CONN_WEST  | CONN_EAST:  return '-';
+        case CONN_NORTH | CONN_EAST:  return 'L';
+        case CONN_NORTH | CONN_WEST:  return 'J';
+        case CONN_SOUTH | CONN_WEST:  return '7';
+        case CONN_SOUTH | CONN_EAST:  return 'F';
         default: return 'S';
     }
 }
 
-/* BFS to find the loop and distances */
+/* BFS to find the loop and distances.
+ * Replaces S with its actual pipe type before traversal to unify handling.
+ */
 static int find_loop(Pos start) {
+    /* Replace S with its actual pipe type to eliminate special-case handling */
+    grid[start.r][start.c] = determine_start_pipe(start);
+
     memset(distances, -1, sizeof(distances));
     memset(in_loop, 0, sizeof(in_loop));
 
@@ -122,6 +135,11 @@ static int find_loop(Pos start) {
         char ch = grid[pos.r][pos.c];
 
         for (int dir = 0; dir < 4; dir++) {
+            /* Check if current pipe connects in this direction */
+            if (!connects_in_dir(ch, dir)) {
+                continue;
+            }
+
             int nr = pos.r + DR[dir];
             int nc = pos.c + DC[dir];
 
@@ -130,23 +148,6 @@ static int find_loop(Pos start) {
             }
 
             char adj = grid[nr][nc];
-            if (get_pipe_connections(adj) == 0) {
-                continue;
-            }
-
-            /* Check if current position connects in this direction */
-            bool curr_connects;
-            if (ch == 'S') {
-                /* S connects to any adjacent pipe that connects back */
-                int opp = opposite_dir(dir);
-                curr_connects = connects_in_dir(adj, opp);
-            } else {
-                curr_connects = connects_in_dir(ch, dir);
-            }
-
-            if (!curr_connects) {
-                continue;
-            }
 
             /* Check if adjacent pipe connects back */
             int opp = opposite_dir(dir);
@@ -168,21 +169,18 @@ static int find_loop(Pos start) {
     return max_dist;
 }
 
-/* Count enclosed tiles using ray casting */
-static int count_enclosed(Pos start) {
-    /* Replace S with its actual pipe type */
-    char start_pipe = determine_start_pipe(start);
-    grid[start.r][start.c] = start_pipe;
-
+/* Count enclosed tiles using ray casting.
+ * Note: S has already been replaced with its actual pipe type by find_loop().
+ */
+static int count_enclosed(void) {
     int enclosed = 0;
 
     for (int r = 0; r < rows; r++) {
         bool inside = false;
         for (int c = 0; c < cols; c++) {
             if (in_loop[r][c]) {
-                char ch = grid[r][c];
-                /* Count pipes with north connection: |, L, J */
-                if (ch == '|' || ch == 'L' || ch == 'J') {
+                /* Toggle inside when crossing pipes with north connection (|, L, J) */
+                if (connects_in_dir(grid[r][c], DIR_NORTH)) {
                     inside = !inside;
                 }
             } else {
@@ -206,6 +204,7 @@ int main(void) {
     rows = 0;
     cols = 0;
 
+    /* +2 accounts for newline character and null terminator */
     char line[MAX_COLS + 2];
     while (fgets(line, sizeof(line), fp) && rows < MAX_ROWS) {
         int len = strlen(line);
@@ -226,7 +225,7 @@ int main(void) {
     Pos start = find_start();
 
     int part1 = find_loop(start);
-    int part2 = count_enclosed(start);
+    int part2 = count_enclosed();
 
     printf("Part 1: %d\n", part1);
     printf("Part 2: %d\n", part2);

@@ -1,86 +1,184 @@
 <?php
 
-$input = trim(file_get_contents(__DIR__ . '/../input.txt'));
-$lines = explode("\n", $input);
+declare(strict_types=1);
 
-// Define pipe connections: each pipe connects to certain directions
-// Directions: N=[-1,0], S=[1,0], E=[0,1], W=[0,-1]
-$PIPE_CONNECTIONS = [
-    '|' => [[-1, 0], [1, 0]],    // N, S
-    '-' => [[0, -1], [0, 1]],    // W, E
-    'L' => [[-1, 0], [0, 1]],    // N, E
-    'J' => [[-1, 0], [0, -1]],   // N, W
-    '7' => [[1, 0], [0, -1]],    // S, W
-    'F' => [[1, 0], [0, 1]],     // S, E
+/**
+ * Advent of Code 2023 - Day 10: Pipe Maze
+ *
+ * Find the main loop in a pipe maze and count enclosed tiles.
+ */
+
+// Character constants
+const CHAR_START = 'S';
+const CHAR_VERTICAL = '|';
+const CHAR_HORIZONTAL = '-';
+const CHAR_BEND_NE = 'L';
+const CHAR_BEND_NW = 'J';
+const CHAR_BEND_SW = '7';
+const CHAR_BEND_SE = 'F';
+
+// Direction constants
+const DIR_NORTH = [-1, 0];
+const DIR_SOUTH = [1, 0];
+const DIR_EAST = [0, 1];
+const DIR_WEST = [0, -1];
+
+/**
+ * Gets pipe connections for a given character.
+ *
+ * @param string $char The pipe character
+ * @return array<int, array{int, int}>|null Connection directions or null if not a pipe
+ */
+function getPipeConnections(string $char): ?array
+{
+    return match ($char) {
+        CHAR_VERTICAL => [DIR_NORTH, DIR_SOUTH],
+        CHAR_HORIZONTAL => [DIR_WEST, DIR_EAST],
+        CHAR_BEND_NE => [DIR_NORTH, DIR_EAST],
+        CHAR_BEND_NW => [DIR_NORTH, DIR_WEST],
+        CHAR_BEND_SW => [DIR_SOUTH, DIR_WEST],
+        CHAR_BEND_SE => [DIR_SOUTH, DIR_EAST],
+        default => null,
+    };
+}
+
+// All pipe characters for iteration
+const PIPE_CHARS = [
+    CHAR_VERTICAL,
+    CHAR_HORIZONTAL,
+    CHAR_BEND_NE,
+    CHAR_BEND_NW,
+    CHAR_BEND_SW,
+    CHAR_BEND_SE,
 ];
 
-function findStart(array $grid): array {
-    foreach ($grid as $r => $row) {
-        for ($c = 0; $c < strlen($row); $c++) {
-            if ($row[$c] === 'S') {
-                return [$r, $c];
-            }
+/**
+ * Creates a string key from row and column coordinates.
+ *
+ * @param int $row Row index
+ * @param int $col Column index
+ * @return string Position key in "row,col" format
+ */
+function positionKey(int $row, int $col): string
+{
+    return $row . ',' . $col;
+}
+
+/**
+ * Finds the starting position (marked with 'S') in the grid.
+ *
+ * @param array<int, string> $grid The input grid
+ * @return array{int, int} Row and column of start position
+ */
+function findStart(array $grid): array
+{
+    foreach ($grid as $row => $line) {
+        $col = strpos($line, CHAR_START);
+        if ($col !== false) {
+            return [$row, $col];
         }
     }
     return [-1, -1];
 }
 
-function getNeighbors(array $grid, array $pos, array $pipeConnections): array {
-    [$r, $c] = $pos;
+/**
+ * Gets valid neighboring positions connected by pipes.
+ *
+ * @param array<int, string> $grid The input grid
+ * @param array{int, int} $pos Current position [row, col]
+ * @return array<int, array{int, int}> List of neighbor positions
+ */
+function getNeighbors(array $grid, array $pos): array
+{
+    [$row, $col] = $pos;
     $rows = count($grid);
     $cols = strlen($grid[0]);
-    $ch = $grid[$r][$c];
+    $char = $grid[$row][$col];
 
-    if ($ch === 'S') {
-        // S can connect to any adjacent pipe that connects back to it
-        $neighbors = [];
-        foreach ([[-1, 0], [1, 0], [0, -1], [0, 1]] as [$dr, $dc]) {
-            $nr = $r + $dr;
-            $nc = $c + $dc;
-            if ($nr >= 0 && $nr < $rows && $nc >= 0 && $nc < $cols) {
-                $adjCh = $grid[$nr][$nc];
-                if (isset($pipeConnections[$adjCh])) {
-                    // Check if adjacent pipe connects back to S
-                    foreach ($pipeConnections[$adjCh] as [$adjDr, $adjDc]) {
-                        if ($nr + $adjDr === $r && $nc + $adjDc === $c) {
-                            $neighbors[] = [$nr, $nc];
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-        return $neighbors;
-    } elseif (isset($pipeConnections[$ch])) {
-        $neighbors = [];
-        foreach ($pipeConnections[$ch] as [$dr, $dc]) {
-            $nr = $r + $dr;
-            $nc = $c + $dc;
-            if ($nr >= 0 && $nr < $rows && $nc >= 0 && $nc < $cols) {
-                $neighbors[] = [$nr, $nc];
-            }
-        }
-        return $neighbors;
+    if ($char === CHAR_START) {
+        return getStartNeighbors($grid, $row, $col, $rows, $cols);
     }
-    return [];
+
+    $connections = getPipeConnections($char);
+    if ($connections === null) {
+        return [];
+    }
+
+    $neighbors = [];
+    foreach ($connections as [$dr, $dc]) {
+        $newRow = $row + $dr;
+        $newCol = $col + $dc;
+        if ($newRow >= 0 && $newRow < $rows && $newCol >= 0 && $newCol < $cols) {
+            $neighbors[] = [$newRow, $newCol];
+        }
+    }
+    return $neighbors;
 }
 
-function findLoop(array $grid, array $start, array $pipeConnections): array {
-    // BFS to find the main loop and distances from start
+/**
+ * Gets neighbors for the start position by finding pipes that connect back to it.
+ *
+ * @param array<int, string> $grid The input grid
+ * @param int $row Start row
+ * @param int $col Start column
+ * @param int $rows Total rows
+ * @param int $cols Total columns
+ * @return array<int, array{int, int}> List of neighbor positions
+ */
+function getStartNeighbors(array $grid, int $row, int $col, int $rows, int $cols): array
+{
+    $neighbors = [];
+    $directions = [DIR_NORTH, DIR_SOUTH, DIR_WEST, DIR_EAST];
+
+    foreach ($directions as [$dr, $dc]) {
+        $newRow = $row + $dr;
+        $newCol = $col + $dc;
+
+        if ($newRow < 0 || $newRow >= $rows || $newCol < 0 || $newCol >= $cols) {
+            continue;
+        }
+
+        $adjChar = $grid[$newRow][$newCol];
+        $adjConnections = getPipeConnections($adjChar);
+        if ($adjConnections === null) {
+            continue;
+        }
+
+        // Check if adjacent pipe connects back to start
+        foreach ($adjConnections as [$adjDr, $adjDc]) {
+            if ($newRow + $adjDr === $row && $newCol + $adjDc === $col) {
+                $neighbors[] = [$newRow, $newCol];
+                break;
+            }
+        }
+    }
+    return $neighbors;
+}
+
+/**
+ * Finds the main loop using BFS and returns distances from start.
+ *
+ * @param array<int, string> $grid The input grid
+ * @param array{int, int} $start Start position
+ * @return array<string, int> Map of position keys to distances
+ */
+function findLoop(array $grid, array $start): array
+{
     $distances = [];
-    $distances[$start[0] . ',' . $start[1]] = 0;
-    $queue = [$start];
-    $head = 0;
+    $distances[positionKey($start[0], $start[1])] = 0;
 
-    while ($head < count($queue)) {
-        $pos = $queue[$head++];
-        $currentDist = $distances[$pos[0] . ',' . $pos[1]];
+    $queue = new SplQueue();
+    $queue->enqueue($start);
 
-        foreach (getNeighbors($grid, $pos, $pipeConnections) as $neighbor) {
-            $key = $neighbor[0] . ',' . $neighbor[1];
+    while (!$queue->isEmpty()) {
+        $pos = $queue->dequeue();
+        $currentDist = $distances[positionKey($pos[0], $pos[1])];
+
+        foreach (getNeighbors($grid, $pos) as $neighbor) {
+            $key = positionKey($neighbor[0], $neighbor[1]);
             if (!isset($distances[$key])) {
                 $distances[$key] = $currentDist + 1;
-                $queue[] = $neighbor;
+                $queue->enqueue($neighbor);
             }
         }
     }
@@ -88,62 +186,94 @@ function findLoop(array $grid, array $start, array $pipeConnections): array {
     return $distances;
 }
 
-function determineStartPipe(array $grid, array $start, array $loopPositions, array $pipeConnections): string {
-    [$r, $c] = $start;
-    $rows = count($grid);
-    $cols = strlen($grid[0]);
-
+/**
+ * Determines what pipe type the start position should be.
+ *
+ * @param array<int, string> $grid The input grid
+ * @param array{int, int} $start Start position
+ * @param array<string, int> $loopPositions Positions that are part of the loop
+ * @return string The pipe character that S represents
+ */
+function determineStartPipe(array $grid, array $start, array $loopPositions): string
+{
+    [$row, $col] = $start;
     $connections = [];
-    foreach ([[-1, 0], [1, 0], [0, -1], [0, 1]] as [$dr, $dc]) {
-        $nr = $r + $dr;
-        $nc = $c + $dc;
-        $key = $nr . ',' . $nc;
+    $directions = [DIR_NORTH, DIR_SOUTH, DIR_WEST, DIR_EAST];
 
-        if (isset($loopPositions[$key])) {
-            $adjCh = $grid[$nr][$nc];
-            if (isset($pipeConnections[$adjCh])) {
-                foreach ($pipeConnections[$adjCh] as [$adjDr, $adjDc]) {
-                    if ($nr + $adjDr === $r && $nc + $adjDc === $c) {
-                        $connections[] = [$dr, $dc];
-                        break;
-                    }
-                }
+    foreach ($directions as [$dr, $dc]) {
+        $newRow = $row + $dr;
+        $newCol = $col + $dc;
+        $key = positionKey($newRow, $newCol);
+
+        if (!isset($loopPositions[$key])) {
+            continue;
+        }
+
+        $adjChar = $grid[$newRow][$newCol];
+        $adjConnections = getPipeConnections($adjChar);
+        if ($adjConnections === null) {
+            continue;
+        }
+
+        foreach ($adjConnections as [$adjDr, $adjDc]) {
+            if ($newRow + $adjDr === $row && $newCol + $adjDc === $col) {
+                $connections[] = [$dr, $dc];
+                break;
             }
         }
     }
 
-    // Convert to a comparable format
+    // Build connection set for comparison
     $connSet = [];
     foreach ($connections as $conn) {
-        $connSet[$conn[0] . ',' . $conn[1]] = true;
+        $connSet[positionKey($conn[0], $conn[1])] = true;
     }
 
-    foreach ($pipeConnections as $pipe => $dirs) {
+    // Find matching pipe type
+    foreach (PIPE_CHARS as $pipe) {
+        $dirs = getPipeConnections($pipe);
         $pipeSet = [];
         foreach ($dirs as $dir) {
-            $pipeSet[$dir[0] . ',' . $dir[1]] = true;
+            $pipeSet[positionKey($dir[0], $dir[1])] = true;
         }
         if (count($connSet) === count($pipeSet) && count(array_diff_key($connSet, $pipeSet)) === 0) {
             return $pipe;
         }
     }
 
-    return 'S';
+    return CHAR_START;
 }
 
-function part1(array $lines, array $pipeConnections): int {
+/**
+ * Solves Part 1: Find the farthest point from the start in the main loop.
+ *
+ * @param array<int, string> $lines The input grid
+ * @return int Maximum distance from start
+ */
+function part1(array $lines): int
+{
     $start = findStart($lines);
-    $distances = findLoop($lines, $start, $pipeConnections);
+    $distances = findLoop($lines, $start);
     return max($distances);
 }
 
-function part2(array $lines, array $pipeConnections): int {
+/**
+ * Solves Part 2: Count tiles enclosed by the main loop.
+ *
+ * Uses ray casting algorithm - a point is inside if it crosses an odd
+ * number of loop boundaries when traced horizontally. We count pipes
+ * with a north-facing connection (|, L, J) as crossings.
+ *
+ * @param array<int, string> $lines The input grid
+ * @return int Number of enclosed tiles
+ */
+function part2(array $lines): int
+{
     $start = findStart($lines);
-    $distances = findLoop($lines, $start, $pipeConnections);
-    $loopPositions = $distances; // The keys are the loop positions
+    $loopPositions = findLoop($lines, $start);
 
     // Replace S with its actual pipe type
-    $startPipe = determineStartPipe($lines, $start, $loopPositions, $pipeConnections);
+    $startPipe = determineStartPipe($lines, $start, $loopPositions);
     $grid = $lines;
     $grid[$start[0]][$start[1]] = $startPipe;
 
@@ -151,21 +281,19 @@ function part2(array $lines, array $pipeConnections): int {
     $cols = strlen($grid[0]);
     $enclosed = 0;
 
-    for ($r = 0; $r < $rows; $r++) {
+    for ($row = 0; $row < $rows; $row++) {
         $inside = false;
-        for ($c = 0; $c < $cols; $c++) {
-            $key = $r . ',' . $c;
+        for ($col = 0; $col < $cols; $col++) {
+            $key = positionKey($row, $col);
+
             if (isset($loopPositions[$key])) {
-                $ch = $grid[$r][$c];
-                // Count vertical crossings (|, L, J go "north")
-                // Using "north" rule: count pipes that have a north connection
-                if ($ch === '|' || $ch === 'L' || $ch === 'J') {
+                $char = $grid[$row][$col];
+                // Count pipes with north-facing connection as crossings
+                if ($char === CHAR_VERTICAL || $char === CHAR_BEND_NE || $char === CHAR_BEND_NW) {
                     $inside = !$inside;
                 }
-            } else {
-                if ($inside) {
-                    $enclosed++;
-                }
+            } elseif ($inside) {
+                $enclosed++;
             }
         }
     }
@@ -173,5 +301,9 @@ function part2(array $lines, array $pipeConnections): int {
     return $enclosed;
 }
 
-echo "Part 1: " . part1($lines, $PIPE_CONNECTIONS) . "\n";
-echo "Part 2: " . part2($lines, $PIPE_CONNECTIONS) . "\n";
+// Main execution
+$input = trim(file_get_contents(__DIR__ . '/../input.txt'));
+$lines = explode("\n", $input);
+
+echo "Part 1: " . part1($lines) . "\n";
+echo "Part 2: " . part2($lines) . "\n";

@@ -3,13 +3,21 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
-	"runtime"
 	"strings"
 )
 
+// Delta represents a directional offset in the grid.
+type Delta struct {
+	dr, dc int
+}
+
+// Point represents a position in the grid.
+type Point struct {
+	r, c int
+}
+
 // Direction deltas: N=(-1,0), S=(1,0), E=(0,1), W=(0,-1)
-var pipeConnections = map[byte][][2]int{
+var pipeConnections = map[byte][]Delta{
 	'|': {{-1, 0}, {1, 0}},  // N, S
 	'-': {{0, -1}, {0, 1}},  // W, E
 	'L': {{-1, 0}, {0, 1}},  // N, E
@@ -18,14 +26,12 @@ var pipeConnections = map[byte][][2]int{
 	'F': {{1, 0}, {0, 1}},   // S, E
 }
 
-type Point struct {
-	r, c int
-}
+var cardinalDirections = []Delta{{-1, 0}, {1, 0}, {0, -1}, {0, 1}}
 
 func findStart(grid []string) Point {
 	for r, row := range grid {
-		for c := 0; c < len(row); c++ {
-			if row[c] == 'S' {
+		for c, ch := range row {
+			if ch == 'S' {
 				return Point{r, c}
 			}
 		}
@@ -42,15 +48,14 @@ func getNeighbors(grid []string, pos Point) []Point {
 
 	if ch == 'S' {
 		// S can connect to any adjacent pipe that connects back to it
-		directions := [][2]int{{-1, 0}, {1, 0}, {0, -1}, {0, 1}}
-		for _, d := range directions {
-			nr, nc := r+d[0], c+d[1]
+		for _, d := range cardinalDirections {
+			nr, nc := r+d.dr, c+d.dc
 			if nr >= 0 && nr < rows && nc >= 0 && nc < cols {
 				adjCh := grid[nr][nc]
 				if dirs, ok := pipeConnections[adjCh]; ok {
 					// Check if adjacent pipe connects back to S
 					for _, adjD := range dirs {
-						if nr+adjD[0] == r && nc+adjD[1] == c {
+						if nr+adjD.dr == r && nc+adjD.dc == c {
 							neighbors = append(neighbors, Point{nr, nc})
 							break
 						}
@@ -60,7 +65,7 @@ func getNeighbors(grid []string, pos Point) []Point {
 		}
 	} else if dirs, ok := pipeConnections[ch]; ok {
 		for _, d := range dirs {
-			nr, nc := r+d[0], c+d[1]
+			nr, nc := r+d.dr, c+d.dc
 			if nr >= 0 && nr < rows && nc >= 0 && nc < cols {
 				neighbors = append(neighbors, Point{nr, nc})
 			}
@@ -73,11 +78,15 @@ func getNeighbors(grid []string, pos Point) []Point {
 func findLoop(grid []string, start Point) map[Point]int {
 	distances := make(map[Point]int)
 	distances[start] = 0
-	queue := []Point{start}
 
-	for len(queue) > 0 {
-		pos := queue[0]
-		queue = queue[1:]
+	// Use index-based queue for efficiency
+	queue := make([]Point, 0, 256)
+	queue = append(queue, start)
+	head := 0
+
+	for head < len(queue) {
+		pos := queue[head]
+		head++
 
 		for _, neighbor := range getNeighbors(grid, pos) {
 			if _, exists := distances[neighbor]; !exists {
@@ -94,18 +103,17 @@ func determineStartPipe(grid []string, start Point, loopPositions map[Point]int)
 	r, c := start.r, start.c
 	rows, cols := len(grid), len(grid[0])
 
-	connections := make(map[[2]int]bool)
-	directions := [][2]int{{-1, 0}, {1, 0}, {0, -1}, {0, 1}}
+	connections := make(map[Delta]bool)
 
-	for _, d := range directions {
-		nr, nc := r+d[0], c+d[1]
+	for _, d := range cardinalDirections {
+		nr, nc := r+d.dr, c+d.dc
 		neighbor := Point{nr, nc}
 		if _, inLoop := loopPositions[neighbor]; inLoop {
 			if nr >= 0 && nr < rows && nc >= 0 && nc < cols {
 				adjCh := grid[nr][nc]
 				if dirs, ok := pipeConnections[adjCh]; ok {
 					for _, adjD := range dirs {
-						if nr+adjD[0] == r && nc+adjD[1] == c {
+						if nr+adjD.dr == r && nc+adjD.dc == c {
 							connections[d] = true
 							break
 						}
@@ -183,11 +191,7 @@ func part2(grid []string) int {
 }
 
 func main() {
-	_, currentFile, _, _ := runtime.Caller(0)
-	dir := filepath.Dir(currentFile)
-	inputPath := filepath.Join(dir, "..", "input.txt")
-
-	data, err := os.ReadFile(inputPath)
+	data, err := os.ReadFile("../input.txt")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error reading input: %v\n", err)
 		os.Exit(1)

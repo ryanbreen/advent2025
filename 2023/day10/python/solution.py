@@ -1,10 +1,7 @@
 from pathlib import Path
 from collections import deque
 
-input_text = (Path(__file__).parent.parent / "input.txt").read_text().strip()
-lines = input_text.split("\n")
-
-# Define pipe connections: each pipe connects to certain directions
+# Pipe connections: each pipe connects to certain directions
 # Directions: N=(-1,0), S=(1,0), E=(0,1), W=(0,-1)
 PIPE_CONNECTIONS = {
     '|': [(-1, 0), (1, 0)],   # N, S
@@ -15,12 +12,20 @@ PIPE_CONNECTIONS = {
     'F': [(1, 0), (0, 1)],    # S, E
 }
 
+
 def find_start(grid):
-    for r, row in enumerate(grid):
-        for c, ch in enumerate(row):
-            if ch == 'S':
-                return (r, c)
-    return None
+    """Find the starting position 'S' in the grid."""
+    return next((r, c) for r, row in enumerate(grid) for c, ch in enumerate(row) if ch == 'S')
+
+
+def connects_back(grid, nr, nc, r, c):
+    """Check if the pipe at (nr, nc) connects back to (r, c)."""
+    adj_ch = grid[nr][nc]
+    return adj_ch in PIPE_CONNECTIONS and any(
+        nr + adj_dr == r and nc + adj_dc == c
+        for adj_dr, adj_dc in PIPE_CONNECTIONS[adj_ch]
+    )
+
 
 def get_neighbors(grid, pos):
     """Get valid pipe neighbors that connect to this position."""
@@ -30,27 +35,21 @@ def get_neighbors(grid, pos):
 
     if ch == 'S':
         # S can connect to any adjacent pipe that connects back to it
-        neighbors = []
-        for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-            nr, nc = r + dr, c + dc
-            if 0 <= nr < rows and 0 <= nc < cols:
-                adj_ch = grid[nr][nc]
-                if adj_ch in PIPE_CONNECTIONS:
-                    # Check if adjacent pipe connects back to S
-                    for adj_dr, adj_dc in PIPE_CONNECTIONS[adj_ch]:
-                        if nr + adj_dr == r and nc + adj_dc == c:
-                            neighbors.append((nr, nc))
-                            break
-        return neighbors
+        return [
+            (nr, nc)
+            for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]
+            for nr, nc in [(r + dr, c + dc)]
+            if 0 <= nr < rows and 0 <= nc < cols and connects_back(grid, nr, nc, r, c)
+        ]
     elif ch in PIPE_CONNECTIONS:
-        neighbors = []
-        for dr, dc in PIPE_CONNECTIONS[ch]:
-            nr, nc = r + dr, c + dc
-            if 0 <= nr < rows and 0 <= nc < cols:
-                neighbors.append((nr, nc))
-        return neighbors
+        return [
+            (r + dr, c + dc)
+            for dr, dc in PIPE_CONNECTIONS[ch]
+            if 0 <= r + dr < rows and 0 <= c + dc < cols
+        ]
     else:
         return []
+
 
 def find_loop(grid, start):
     """BFS to find the main loop and distances from start."""
@@ -66,47 +65,36 @@ def find_loop(grid, start):
 
     return distances
 
+
 def determine_start_pipe(grid, start, loop_positions):
     """Determine what pipe type S actually is based on its connections."""
     r, c = start
-    rows, cols = len(grid), len(grid[0])
 
-    connections = []
-    for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-        nr, nc = r + dr, c + dc
-        if (nr, nc) in loop_positions:
-            adj_ch = grid[nr][nc]
-            if adj_ch in PIPE_CONNECTIONS:
-                # Check if this pipe connects back to S
-                for adj_dr, adj_dc in PIPE_CONNECTIONS[adj_ch]:
-                    if nr + adj_dr == r and nc + adj_dc == c:
-                        connections.append((dr, dc))
-                        break
+    connections = {
+        (dr, dc)
+        for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        if (r + dr, c + dc) in loop_positions and connects_back(grid, r + dr, c + dc, r, c)
+    }
 
-    connections = set(connections)
-
-    for pipe, dirs in PIPE_CONNECTIONS.items():
-        if set(dirs) == connections:
-            return pipe
-
-    return 'S'
+    return next((pipe for pipe, dirs in PIPE_CONNECTIONS.items() if set(dirs) == connections), 'S')
 
 
-def part1():
-    start = find_start(lines)
-    distances = find_loop(lines, start)
+def part1(grid):
+    """Find the farthest point from the start along the loop."""
+    start = find_start(grid)
+    distances = find_loop(grid, start)
     return max(distances.values())
 
 
-def part2():
+def part2(grid):
     """Count tiles enclosed by the loop using ray casting (crossing number)."""
-    start = find_start(lines)
-    distances = find_loop(lines, start)
+    start = find_start(grid)
+    distances = find_loop(grid, start)
     loop_positions = set(distances.keys())
 
     # Replace S with its actual pipe type
-    start_pipe = determine_start_pipe(lines, start, loop_positions)
-    grid = [list(row) for row in lines]
+    start_pipe = determine_start_pipe(grid, start, loop_positions)
+    grid = [list(row) for row in grid]
     grid[start[0]][start[1]] = start_pipe
 
     rows, cols = len(grid), len(grid[0])
@@ -116,18 +104,18 @@ def part2():
         inside = False
         for c in range(cols):
             if (r, c) in loop_positions:
-                ch = grid[r][c]
-                # Count vertical crossings (|, L, J go "north")
-                # Using "north" rule: count pipes that have a north connection
-                if ch in '|LJ':
+                # Count vertical crossings using "north" rule
+                if grid[r][c] in '|LJ':
                     inside = not inside
-            else:
-                if inside:
-                    enclosed += 1
+            elif inside:
+                enclosed += 1
 
     return enclosed
 
 
 if __name__ == "__main__":
-    print(f"Part 1: {part1()}")
-    print(f"Part 2: {part2()}")
+    input_text = (Path(__file__).parent.parent / "input.txt").read_text().strip()
+    lines = input_text.split("\n")
+
+    print(f"Part 1: {part1(lines)}")
+    print(f"Part 2: {part2(lines)}")

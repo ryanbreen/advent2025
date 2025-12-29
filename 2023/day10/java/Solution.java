@@ -4,72 +4,89 @@ import java.util.*;
 
 public class Solution {
 
-    // Pipe connections: each pipe connects to certain directions
-    // Directions: N=(-1,0), S=(1,0), E=(0,1), W=(0,-1)
-    private static final Map<Character, int[][]> PIPE_CONNECTIONS = new HashMap<>();
+    record Point(int row, int col) {}
 
-    static {
-        PIPE_CONNECTIONS.put('|', new int[][]{{-1, 0}, {1, 0}});   // N, S
-        PIPE_CONNECTIONS.put('-', new int[][]{{0, -1}, {0, 1}});   // W, E
-        PIPE_CONNECTIONS.put('L', new int[][]{{-1, 0}, {0, 1}});   // N, E
-        PIPE_CONNECTIONS.put('J', new int[][]{{-1, 0}, {0, -1}});  // N, W
-        PIPE_CONNECTIONS.put('7', new int[][]{{1, 0}, {0, -1}});   // S, W
-        PIPE_CONNECTIONS.put('F', new int[][]{{1, 0}, {0, 1}});    // S, E
+    enum Direction {
+        NORTH(-1, 0),
+        SOUTH(1, 0),
+        EAST(0, 1),
+        WEST(0, -1);
+
+        final int dr, dc;
+
+        Direction(int dr, int dc) {
+            this.dr = dr;
+            this.dc = dc;
+        }
+
+        Direction opposite() {
+            return switch (this) {
+                case NORTH -> SOUTH;
+                case SOUTH -> NORTH;
+                case EAST -> WEST;
+                case WEST -> EAST;
+            };
+        }
     }
 
-    private final List<String> lines;
-    private char[][] grid;
+    private static final Map<Character, Set<Direction>> PIPE_CONNECTIONS = Map.of(
+        '|', EnumSet.of(Direction.NORTH, Direction.SOUTH),
+        '-', EnumSet.of(Direction.WEST, Direction.EAST),
+        'L', EnumSet.of(Direction.NORTH, Direction.EAST),
+        'J', EnumSet.of(Direction.NORTH, Direction.WEST),
+        '7', EnumSet.of(Direction.SOUTH, Direction.WEST),
+        'F', EnumSet.of(Direction.SOUTH, Direction.EAST)
+    );
+
+    private final char[][] grid;
+    private Map<Point, Integer> cachedLoop;
+    private Point cachedStart;
 
     public Solution(List<String> lines) {
-        this.lines = lines;
         this.grid = new char[lines.size()][];
-        for (int i = 0; i < lines.size(); i++) {
+        for (var i = 0; i < lines.size(); i++) {
             this.grid[i] = lines.get(i).toCharArray();
         }
     }
 
-    private int[] findStart() {
-        for (int r = 0; r < grid.length; r++) {
-            for (int c = 0; c < grid[r].length; c++) {
+    private Point findStart() {
+        for (var r = 0; r < grid.length; r++) {
+            for (var c = 0; c < grid[r].length; c++) {
                 if (grid[r][c] == 'S') {
-                    return new int[]{r, c};
+                    return new Point(r, c);
                 }
             }
         }
-        return null;
+        throw new IllegalStateException("No start position 'S' found in grid");
     }
 
-    private List<int[]> getNeighbors(int r, int c) {
-        int rows = grid.length;
-        int cols = grid[0].length;
-        char ch = grid[r][c];
-        List<int[]> neighbors = new ArrayList<>();
+    private List<Point> getNeighbors(Point pos) {
+        var rows = grid.length;
+        var cols = grid[0].length;
+        var ch = grid[pos.row()][pos.col()];
+        var neighbors = new ArrayList<Point>();
 
         if (ch == 'S') {
-            // S can connect to any adjacent pipe that connects back to it
-            int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
-            for (int[] dir : directions) {
-                int nr = r + dir[0];
-                int nc = c + dir[1];
+            for (var dir : Direction.values()) {
+                var nr = pos.row() + dir.dr;
+                var nc = pos.col() + dir.dc;
                 if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
-                    char adjCh = grid[nr][nc];
-                    if (PIPE_CONNECTIONS.containsKey(adjCh)) {
-                        // Check if adjacent pipe connects back to S
-                        for (int[] adjDir : PIPE_CONNECTIONS.get(adjCh)) {
-                            if (nr + adjDir[0] == r && nc + adjDir[1] == c) {
-                                neighbors.add(new int[]{nr, nc});
-                                break;
-                            }
-                        }
+                    var adjCh = grid[nr][nc];
+                    var connections = PIPE_CONNECTIONS.get(adjCh);
+                    if (connections != null && connections.contains(dir.opposite())) {
+                        neighbors.add(new Point(nr, nc));
                     }
                 }
             }
-        } else if (PIPE_CONNECTIONS.containsKey(ch)) {
-            for (int[] dir : PIPE_CONNECTIONS.get(ch)) {
-                int nr = r + dir[0];
-                int nc = c + dir[1];
-                if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
-                    neighbors.add(new int[]{nr, nc});
+        } else {
+            var connections = PIPE_CONNECTIONS.get(ch);
+            if (connections != null) {
+                for (var dir : connections) {
+                    var nr = pos.row() + dir.dr;
+                    var nc = pos.col() + dir.dc;
+                    if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
+                        neighbors.add(new Point(nr, nc));
+                    }
                 }
             }
         }
@@ -77,24 +94,20 @@ public class Solution {
         return neighbors;
     }
 
-    private Map<Long, Integer> findLoop(int[] start) {
-        // BFS to find the main loop and distances from start
-        Map<Long, Integer> distances = new HashMap<>();
-        long startKey = encodePosition(start[0], start[1]);
-        distances.put(startKey, 0);
+    private Map<Point, Integer> findLoop(Point start) {
+        var distances = new HashMap<Point, Integer>();
+        distances.put(start, 0);
 
-        Queue<int[]> queue = new LinkedList<>();
+        var queue = new ArrayDeque<Point>();
         queue.add(start);
 
         while (!queue.isEmpty()) {
-            int[] pos = queue.poll();
-            long posKey = encodePosition(pos[0], pos[1]);
-            int dist = distances.get(posKey);
+            var pos = queue.poll();
+            var dist = distances.get(pos);
 
-            for (int[] neighbor : getNeighbors(pos[0], pos[1])) {
-                long neighborKey = encodePosition(neighbor[0], neighbor[1]);
-                if (!distances.containsKey(neighborKey)) {
-                    distances.put(neighborKey, dist + 1);
+            for (var neighbor : getNeighbors(pos)) {
+                if (!distances.containsKey(neighbor)) {
+                    distances.put(neighbor, dist + 1);
                     queue.add(neighbor);
                 }
             }
@@ -103,86 +116,70 @@ public class Solution {
         return distances;
     }
 
-    private long encodePosition(int r, int c) {
-        return ((long) r << 32) | (c & 0xFFFFFFFFL);
+    private void ensureLoopCached() {
+        if (cachedLoop == null) {
+            cachedStart = findStart();
+            cachedLoop = findLoop(cachedStart);
+        }
     }
 
-    private char determineStartPipe(int[] start, Set<Long> loopPositions) {
-        int r = start[0];
-        int c = start[1];
-        int rows = grid.length;
-        int cols = grid[0].length;
+    private char determineStartPipe(Point start, Set<Point> loopPositions) {
+        var rows = grid.length;
+        var cols = grid[0].length;
+        var connections = EnumSet.noneOf(Direction.class);
 
-        Set<String> connections = new HashSet<>();
-        int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+        for (var dir : Direction.values()) {
+            var nr = start.row() + dir.dr;
+            var nc = start.col() + dir.dc;
+            var neighbor = new Point(nr, nc);
 
-        for (int[] dir : directions) {
-            int nr = r + dir[0];
-            int nc = c + dir[1];
-            long nKey = encodePosition(nr, nc);
-
-            if (loopPositions.contains(nKey)) {
-                char adjCh = grid[nr][nc];
-                if (PIPE_CONNECTIONS.containsKey(adjCh)) {
-                    // Check if this pipe connects back to S
-                    for (int[] adjDir : PIPE_CONNECTIONS.get(adjCh)) {
-                        if (nr + adjDir[0] == r && nc + adjDir[1] == c) {
-                            connections.add(dir[0] + "," + dir[1]);
-                            break;
-                        }
-                    }
+            if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && loopPositions.contains(neighbor)) {
+                var adjCh = grid[nr][nc];
+                var adjConnections = PIPE_CONNECTIONS.get(adjCh);
+                if (adjConnections != null && adjConnections.contains(dir.opposite())) {
+                    connections.add(dir);
                 }
             }
         }
 
-        // Match connections to pipe type
-        for (Map.Entry<Character, int[][]> entry : PIPE_CONNECTIONS.entrySet()) {
-            Set<String> pipeConns = new HashSet<>();
-            for (int[] dir : entry.getValue()) {
-                pipeConns.add(dir[0] + "," + dir[1]);
-            }
-            if (pipeConns.equals(connections)) {
+        for (var entry : PIPE_CONNECTIONS.entrySet()) {
+            if (entry.getValue().equals(connections)) {
                 return entry.getKey();
             }
         }
 
-        return 'S';
+        throw new IllegalStateException("Could not determine start pipe type");
     }
 
     public int part1() {
-        int[] start = findStart();
-        Map<Long, Integer> distances = findLoop(start);
-        return Collections.max(distances.values());
+        ensureLoopCached();
+        return Collections.max(cachedLoop.values());
     }
 
     public int part2() {
-        int[] start = findStart();
-        Map<Long, Integer> distances = findLoop(start);
-        Set<Long> loopPositions = distances.keySet();
+        ensureLoopCached();
+        var loopPositions = cachedLoop.keySet();
 
-        // Replace S with its actual pipe type
-        char startPipe = determineStartPipe(start, loopPositions);
-        grid[start[0]][start[1]] = startPipe;
+        var startPipe = determineStartPipe(cachedStart, loopPositions);
+        grid[cachedStart.row()][cachedStart.col()] = startPipe;
 
-        int rows = grid.length;
-        int cols = grid[0].length;
-        int enclosed = 0;
+        var rows = grid.length;
+        var cols = grid[0].length;
+        var enclosed = 0;
 
-        for (int r = 0; r < rows; r++) {
-            boolean inside = false;
-            for (int c = 0; c < cols; c++) {
-                long key = encodePosition(r, c);
-                if (loopPositions.contains(key)) {
-                    char ch = grid[r][c];
-                    // Count vertical crossings (|, L, J go "north")
-                    // Using "north" rule: count pipes that have a north connection
-                    if (ch == '|' || ch == 'L' || ch == 'J') {
+        for (var r = 0; r < rows; r++) {
+            var inside = false;
+            for (var c = 0; c < cols; c++) {
+                var pos = new Point(r, c);
+                if (loopPositions.contains(pos)) {
+                    var ch = grid[r][c];
+                    // Count vertical crossings using "north" rule
+                    var connections = PIPE_CONNECTIONS.get(ch);
+                    if (connections != null && connections.contains(Direction.NORTH)) {
                         inside = !inside;
                     }
-                } else {
-                    if (inside) {
-                        enclosed++;
-                    }
+                } else if (inside) {
+                    enclosed++;
                 }
             }
         }
@@ -191,10 +188,10 @@ public class Solution {
     }
 
     public static void main(String[] args) throws IOException {
-        Path inputPath = Paths.get(args.length > 0 ? args[0] : "../input.txt");
-        List<String> lines = Files.readAllLines(inputPath);
+        var inputPath = Paths.get(args.length > 0 ? args[0] : "../input.txt");
+        var lines = Files.readAllLines(inputPath);
 
-        Solution solution = new Solution(lines);
+        var solution = new Solution(lines);
         System.out.println("Part 1: " + solution.part1());
         System.out.println("Part 2: " + solution.part2());
     }

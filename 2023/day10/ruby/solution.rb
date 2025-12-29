@@ -1,11 +1,13 @@
 #!/usr/bin/env ruby
+# frozen_string_literal: true
 
 require 'set'
 
 # Day 10: Pipe Maze
 
-input_path = File.join(__dir__, '..', 'input.txt')
-lines = File.read(input_path).strip.split("\n")
+# Direction constants
+DIRECTIONS = [[-1, 0], [1, 0], [0, -1], [0, 1]].freeze
+NORTH_PIPES = '|LJ'
 
 # Define pipe connections: each pipe connects to certain directions
 # Directions: N=[-1,0], S=[1,0], E=[0,1], W=[0,-1]
@@ -18,11 +20,21 @@ PIPE_CONNECTIONS = {
   'F' => [[1, 0], [0, 1]]     # S, E
 }.freeze
 
+def in_bounds?(r, c, rows, cols)
+  r.between?(0, rows - 1) && c.between?(0, cols - 1)
+end
+
+def connects_back?(grid, nr, nc, r, c)
+  adj_ch = grid[nr][nc]
+  return false unless PIPE_CONNECTIONS.key?(adj_ch)
+
+  PIPE_CONNECTIONS[adj_ch].any? { |adj_dr, adj_dc| nr + adj_dr == r && nc + adj_dc == c }
+end
+
 def find_start(grid)
   grid.each_with_index do |row, r|
-    row.chars.each_with_index do |ch, c|
-      return [r, c] if ch == 'S'
-    end
+    c = row.index('S')
+    return [r, c] if c
   end
   nil
 end
@@ -35,29 +47,15 @@ def get_neighbors(grid, pos)
 
   if ch == 'S'
     # S can connect to any adjacent pipe that connects back to it
-    neighbors = []
-    [[-1, 0], [1, 0], [0, -1], [0, 1]].each do |dr, dc|
+    DIRECTIONS.map do |dr, dc|
       nr, nc = r + dr, c + dc
-      next unless nr >= 0 && nr < rows && nc >= 0 && nc < cols
-
-      adj_ch = grid[nr][nc]
-      if PIPE_CONNECTIONS.key?(adj_ch)
-        PIPE_CONNECTIONS[adj_ch].each do |adj_dr, adj_dc|
-          if nr + adj_dr == r && nc + adj_dc == c
-            neighbors << [nr, nc]
-            break
-          end
-        end
-      end
-    end
-    neighbors
+      [nr, nc] if in_bounds?(nr, nc, rows, cols) && connects_back?(grid, nr, nc, r, c)
+    end.compact
   elsif PIPE_CONNECTIONS.key?(ch)
-    neighbors = []
-    PIPE_CONNECTIONS[ch].each do |dr, dc|
+    PIPE_CONNECTIONS[ch].map do |dr, dc|
       nr, nc = r + dr, c + dc
-      neighbors << [nr, nc] if nr >= 0 && nr < rows && nc >= 0 && nc < cols
-    end
-    neighbors
+      [nr, nc] if in_bounds?(nr, nc, rows, cols)
+    end.compact
   else
     []
   end
@@ -84,71 +82,54 @@ end
 def determine_start_pipe(grid, start, loop_positions)
   # Determine what pipe type S actually is based on its connections
   r, c = start
-  rows = grid.length
-  cols = grid[0].length
 
-  connections = []
-  [[-1, 0], [1, 0], [0, -1], [0, 1]].each do |dr, dc|
+  connections = DIRECTIONS.map do |dr, dc|
     nr, nc = r + dr, c + dc
-    next unless loop_positions.include?([nr, nc])
-
-    adj_ch = grid[nr][nc]
-    if PIPE_CONNECTIONS.key?(adj_ch)
-      PIPE_CONNECTIONS[adj_ch].each do |adj_dr, adj_dc|
-        if nr + adj_dr == r && nc + adj_dc == c
-          connections << [dr, dc]
-          break
-        end
-      end
-    end
-  end
+    [dr, dc] if loop_positions.include?([nr, nc]) && connects_back?(grid, nr, nc, r, c)
+  end.compact
 
   connections_set = connections.to_set
 
-  PIPE_CONNECTIONS.each do |pipe, dirs|
-    return pipe if dirs.to_set == connections_set
-  end
-
-  'S'
+  result = PIPE_CONNECTIONS.find { |_, dirs| dirs.to_set == connections_set }
+  result ? result.first : 'S'
 end
 
-def part1(lines)
-  start = find_start(lines)
-  distances = find_loop(lines, start)
+def part1(grid)
+  start = find_start(grid)
+  distances = find_loop(grid, start)
   distances.values.max
 end
 
-def part2(lines)
+def part2(grid)
   # Count tiles enclosed by the loop using ray casting (crossing number)
-  start = find_start(lines)
-  distances = find_loop(lines, start)
+  start = find_start(grid)
+  distances = find_loop(grid, start)
   loop_positions = distances.keys.to_set
 
   # Replace S with its actual pipe type
-  start_pipe = determine_start_pipe(lines, start, loop_positions)
-  grid = lines.map(&:chars)
+  start_pipe = determine_start_pipe(grid, start, loop_positions)
+  grid = grid.map(&:dup)
   grid[start[0]][start[1]] = start_pipe
 
-  rows = grid.length
-  cols = grid[0].length
-  enclosed = 0
-
-  (0...rows).each do |r|
+  grid.each_with_index.sum do |row, r|
     inside = false
-    (0...cols).each do |c|
+    row.each_char.with_index.sum do |ch, c|
       if loop_positions.include?([r, c])
-        ch = grid[r][c]
         # Count vertical crossings (|, L, J go "north")
         # Using "north" rule: count pipes that have a north connection
-        inside = !inside if '|LJ'.include?(ch)
+        inside = !inside if NORTH_PIPES.include?(ch)
+        0
       elsif inside
-        enclosed += 1
+        1
+      else
+        0
       end
     end
   end
-
-  enclosed
 end
 
-puts "Part 1: #{part1(lines)}"
-puts "Part 2: #{part2(lines)}"
+input_path = File.join(__dir__, '..', 'input.txt')
+grid = File.read(input_path).strip.split("\n")
+
+puts "Part 1: #{part1(grid)}"
+puts "Part 2: #{part2(grid)}"
