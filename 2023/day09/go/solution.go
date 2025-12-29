@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -15,21 +16,17 @@ func parseInput(text string) [][]int {
 		parts := strings.Fields(line)
 		seq := make([]int, len(parts))
 		for j, p := range parts {
-			num, _ := strconv.Atoi(p)
+			num, err := strconv.Atoi(p)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error parsing number %q: %v\n", p, err)
+				os.Exit(1)
+			}
 			seq[j] = num
 		}
 		histories[i] = seq
 	}
 
 	return histories
-}
-
-func getDifferences(seq []int) []int {
-	diffs := make([]int, len(seq)-1)
-	for i := 0; i < len(seq)-1; i++ {
-		diffs[i] = seq[i+1] - seq[i]
-	}
-	return diffs
 }
 
 func allZero(seq []int) bool {
@@ -41,52 +38,33 @@ func allZero(seq []int) bool {
 	return true
 }
 
+// extrapolateNext computes the next value in the sequence by building
+// difference pyramids and propagating the extrapolated value upward.
 func extrapolateNext(seq []int) int {
-	sequences := [][]int{seq}
-	current := seq
-
-	for !allZero(current) {
-		current = getDifferences(current)
-		sequences = append(sequences, current)
+	if allZero(seq) {
+		return 0
 	}
 
-	for i := len(sequences) - 2; i >= 0; i-- {
-		lastVal := sequences[i][len(sequences[i])-1]
-		belowVal := sequences[i+1][len(sequences[i+1])-1]
-		sequences[i] = append(sequences[i], lastVal+belowVal)
+	// Compute differences
+	diffs := make([]int, len(seq)-1)
+	for i := range diffs {
+		diffs[i] = seq[i+1] - seq[i]
 	}
 
-	return sequences[0][len(sequences[0])-1]
+	// Recursively extrapolate and add to last element
+	return seq[len(seq)-1] + extrapolateNext(diffs)
 }
 
-func extrapolatePrev(seq []int) int {
-	sequences := [][]int{seq}
-	current := seq
-
-	for !allZero(current) {
-		current = getDifferences(current)
-		sequences = append(sequences, current)
+func reverse(seq []int) {
+	for i, j := 0, len(seq)-1; i < j; i, j = i+1, j-1 {
+		seq[i], seq[j] = seq[j], seq[i]
 	}
-
-	for i := len(sequences) - 2; i >= 0; i-- {
-		firstVal := sequences[i][0]
-		belowVal := sequences[i+1][0]
-		sequences[i] = append([]int{firstVal - belowVal}, sequences[i]...)
-	}
-
-	return sequences[0][0]
-}
-
-func copySeq(seq []int) []int {
-	cp := make([]int, len(seq))
-	copy(cp, seq)
-	return cp
 }
 
 func part1(histories [][]int) int {
 	sum := 0
 	for _, h := range histories {
-		sum += extrapolateNext(copySeq(h))
+		sum += extrapolateNext(slices.Clone(h))
 	}
 	return sum
 }
@@ -94,7 +72,11 @@ func part1(histories [][]int) int {
 func part2(histories [][]int) int {
 	sum := 0
 	for _, h := range histories {
-		sum += extrapolatePrev(copySeq(h))
+		// Reverse the sequence and extrapolate forward
+		// This is equivalent to extrapolating backward on the original
+		reversed := slices.Clone(h)
+		reverse(reversed)
+		sum += extrapolateNext(reversed)
 	}
 	return sum
 }

@@ -1,5 +1,10 @@
+//! Advent of Code 2023 - Day 9: Mirage Maintenance
+//!
+//! Extrapolates values from OASIS report sequences using difference pyramids.
+
 use std::fs;
 
+/// Parses the input into a vector of number sequences.
 fn parse_input(text: &str) -> Vec<Vec<i64>> {
     text.lines()
         .filter(|line| !line.is_empty())
@@ -11,52 +16,35 @@ fn parse_input(text: &str) -> Vec<Vec<i64>> {
         .collect()
 }
 
-fn get_differences(seq: &[i64]) -> Vec<i64> {
-    seq.windows(2).map(|w| w[1] - w[0]).collect()
+/// Extrapolates the next value in a sequence using the difference pyramid method.
+///
+/// Builds successive difference sequences until all zeros, then sums the last
+/// elements working back up to find the extrapolated value.
+fn extrapolate(seq: &[i64]) -> i64 {
+    if seq.iter().all(|&x| x == 0) {
+        return 0;
+    }
+    let differences: Vec<i64> = seq.windows(2).map(|w| w[1] - w[0]).collect();
+    seq.last().unwrap() + extrapolate(&differences)
 }
 
-fn extrapolate_next(seq: &[i64]) -> i64 {
-    let mut sequences: Vec<Vec<i64>> = vec![seq.to_vec()];
-    let mut current = seq.to_vec();
-
-    while !current.iter().all(|&x| x == 0) {
-        current = get_differences(&current);
-        sequences.push(current.clone());
-    }
-
-    // Work backwards, adding last elements
-    for i in (0..sequences.len() - 1).rev() {
-        let next_val = sequences[i].last().unwrap() + sequences[i + 1].last().unwrap();
-        sequences[i].push(next_val);
-    }
-
-    *sequences[0].last().unwrap()
-}
-
-fn extrapolate_prev(seq: &[i64]) -> i64 {
-    let mut sequences: Vec<Vec<i64>> = vec![seq.to_vec()];
-    let mut current = seq.to_vec();
-
-    while !current.iter().all(|&x| x == 0) {
-        current = get_differences(&current);
-        sequences.push(current.clone());
-    }
-
-    // Work backwards, subtracting first elements
-    for i in (0..sequences.len() - 1).rev() {
-        let prev_val = sequences[i][0] - sequences[i + 1][0];
-        sequences[i].insert(0, prev_val);
-    }
-
-    sequences[0][0]
-}
-
+/// Part 1: Sum of extrapolated next values for all sequences.
 fn part1(histories: &[Vec<i64>]) -> i64 {
-    histories.iter().map(|h| extrapolate_next(h)).sum()
+    histories.iter().map(|h| extrapolate(h)).sum()
 }
 
+/// Part 2: Sum of extrapolated previous values for all sequences.
+///
+/// Key insight: Extrapolating backwards is equivalent to extrapolating forwards
+/// on the reversed sequence. This avoids O(n) insertions at index 0.
 fn part2(histories: &[Vec<i64>]) -> i64 {
-    histories.iter().map(|h| extrapolate_prev(h)).sum()
+    histories
+        .iter()
+        .map(|h| {
+            let reversed: Vec<i64> = h.iter().copied().rev().collect();
+            extrapolate(&reversed)
+        })
+        .sum()
 }
 
 fn main() {

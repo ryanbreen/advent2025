@@ -32,13 +32,10 @@ public class Solution {
     }
 
     private static boolean allZeros(long[] seq) {
-        for (long val : seq) {
-            if (val != 0) return false;
-        }
-        return true;
+        return Arrays.stream(seq).allMatch(v -> v == 0);
     }
 
-    private static long extrapolateNext(long[] seq) {
+    private static List<long[]> buildDifferenceSequences(long[] seq) {
         List<long[]> sequences = new ArrayList<>();
         sequences.add(seq);
 
@@ -47,35 +44,33 @@ public class Solution {
             current = getDifferences(current);
             sequences.add(current);
         }
+
+        return sequences;
+    }
+
+    private static long extrapolateNext(long[] seq) {
+        List<long[]> sequences = buildDifferenceSequences(seq);
 
         // Work backwards from bottom, adding last values
         long extrapolated = 0;
         for (int i = sequences.size() - 2; i >= 0; i--) {
-            long[] s = sequences.get(i);
-            extrapolated = s[s.length - 1] + extrapolated;
+            extrapolated += sequences.get(i)[sequences.get(i).length - 1];
         }
 
         return extrapolated;
     }
 
+    private static long[] reverse(long[] arr) {
+        long[] reversed = new long[arr.length];
+        for (int i = 0; i < arr.length; i++) {
+            reversed[i] = arr[arr.length - 1 - i];
+        }
+        return reversed;
+    }
+
     private static long extrapolatePrev(long[] seq) {
-        List<long[]> sequences = new ArrayList<>();
-        sequences.add(seq);
-
-        long[] current = seq;
-        while (!allZeros(current)) {
-            current = getDifferences(current);
-            sequences.add(current);
-        }
-
-        // Work backwards from bottom, subtracting first values
-        long extrapolated = 0;
-        for (int i = sequences.size() - 2; i >= 0; i--) {
-            long[] s = sequences.get(i);
-            extrapolated = s[0] - extrapolated;
-        }
-
-        return extrapolated;
+        // Extrapolating backwards is equivalent to reversing and extrapolating forward
+        return extrapolateNext(reverse(seq));
     }
 
     private static long part1(List<long[]> histories) {

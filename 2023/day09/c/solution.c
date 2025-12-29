@@ -1,21 +1,19 @@
+/*
+ * Advent of Code 2023 - Day 9: Mirage Maintenance
+ * Extrapolate OASIS sequence values using difference pyramids.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 
 #define MAX_LINE_LEN 1024
-#define MAX_SEQUENCES 256
+#define MAX_DEPTH 64
 #define MAX_VALUES 128
 
-static long sequences[MAX_SEQUENCES][MAX_VALUES];
-static int sequence_lengths[MAX_SEQUENCES];
-
-static int get_differences(long *src, int src_len, long *dst) {
-    for (int i = 0; i < src_len - 1; i++) {
-        dst[i] = src[i + 1] - src[i];
-    }
-    return src_len - 1;
-}
+static long pyramid[MAX_DEPTH][MAX_VALUES];
+static int pyramid_lengths[MAX_DEPTH];
 
 static bool all_zeros(long *seq, int len) {
     for (int i = 0; i < len; i++) {
@@ -26,62 +24,47 @@ static bool all_zeros(long *seq, int len) {
     return true;
 }
 
-static long extrapolate_next(long *seq, int len) {
-    int num_sequences = 0;
+static int build_difference_pyramid(long *seq, int len) {
+    memcpy(pyramid[0], seq, len * sizeof(long));
+    pyramid_lengths[0] = len;
 
-    memcpy(sequences[0], seq, len * sizeof(long));
-    sequence_lengths[0] = len;
-    num_sequences = 1;
-
-    long *current = sequences[0];
+    int depth = 1;
+    long *current = pyramid[0];
     int current_len = len;
 
     while (!all_zeros(current, current_len)) {
-        sequence_lengths[num_sequences] = get_differences(current, current_len,
-                                                          sequences[num_sequences]);
-        current = sequences[num_sequences];
-        current_len = sequence_lengths[num_sequences];
-        num_sequences++;
+        int next_len = current_len - 1;
+        for (int i = 0; i < next_len; i++) {
+            pyramid[depth][i] = current[i + 1] - current[i];
+        }
+        pyramid_lengths[depth] = next_len;
+        current = pyramid[depth];
+        current_len = next_len;
+        depth++;
     }
 
-    for (int i = num_sequences - 2; i >= 0; i--) {
-        int this_len = sequence_lengths[i];
-        int next_len = sequence_lengths[i + 1];
-        long new_val = sequences[i][this_len - 1] + sequences[i + 1][next_len - 1];
-        sequences[i][this_len] = new_val;
-        sequence_lengths[i]++;
-    }
-
-    return sequences[0][sequence_lengths[0] - 1];
+    return depth;
 }
 
-static long extrapolate_prev(long *seq, int len) {
-    int num_sequences = 0;
+static long extrapolate_next(long *seq, int len) {
+    int depth = build_difference_pyramid(seq, len);
 
-    memcpy(sequences[0], seq, len * sizeof(long));
-    sequence_lengths[0] = len;
-    num_sequences = 1;
-
-    long *current = sequences[0];
-    int current_len = len;
-
-    while (!all_zeros(current, current_len)) {
-        sequence_lengths[num_sequences] = get_differences(current, current_len,
-                                                          sequences[num_sequences]);
-        current = sequences[num_sequences];
-        current_len = sequence_lengths[num_sequences];
-        num_sequences++;
+    for (int i = depth - 2; i >= 0; i--) {
+        int this_len = pyramid_lengths[i];
+        int next_len = pyramid_lengths[i + 1];
+        pyramid[i][this_len] = pyramid[i][this_len - 1] + pyramid[i + 1][next_len - 1];
+        pyramid_lengths[i]++;
     }
 
-    for (int i = num_sequences - 2; i >= 0; i--) {
-        long new_val = sequences[i][0] - sequences[i + 1][0];
-        int this_len = sequence_lengths[i];
-        memmove(&sequences[i][1], &sequences[i][0], this_len * sizeof(long));
-        sequences[i][0] = new_val;
-        sequence_lengths[i]++;
-    }
+    return pyramid[0][pyramid_lengths[0] - 1];
+}
 
-    return sequences[0][0];
+static void reverse_array(long *arr, int len) {
+    for (int i = 0; i < len / 2; i++) {
+        long tmp = arr[i];
+        arr[i] = arr[len - 1 - i];
+        arr[len - 1 - i] = tmp;
+    }
 }
 
 int main(void) {
@@ -101,18 +84,14 @@ int main(void) {
 
         char *token = strtok(line, " \t\n");
         while (token != NULL && count < MAX_VALUES) {
-            values[count++] = atol(token);
+            values[count++] = strtol(token, NULL, 10);
             token = strtok(NULL, " \t\n");
         }
 
         if (count > 0) {
-            long copy1[MAX_VALUES];
-            long copy2[MAX_VALUES];
-            memcpy(copy1, values, count * sizeof(long));
-            memcpy(copy2, values, count * sizeof(long));
-
-            part1 += extrapolate_next(copy1, count);
-            part2 += extrapolate_prev(copy2, count);
+            part1 += extrapolate_next(values, count);
+            reverse_array(values, count);
+            part2 += extrapolate_next(values, count);
         }
     }
 

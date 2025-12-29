@@ -15,7 +15,7 @@
 
 (defun parse-line (line)
   "Parse a line of space-separated integers."
-  (mapcar #'(lambda (s) (parse-integer s)) (split-string line)))
+  (mapcar #'parse-integer (split-string line)))
 
 (defun read-input (filename)
   "Read the input file and parse each line into a list of integers."
@@ -34,38 +34,27 @@
   "Check if all elements in the sequence are zero."
   (every #'zerop seq))
 
-(defun extrapolate-next (seq)
-  "Extrapolate the next value in the sequence."
-  (let ((sequences (list seq)))
-    ;; Build the pyramid of differences
-    (loop for current = seq then diffs
-          for diffs = (get-differences current)
-          do (push diffs sequences)
-          until (all-zeros-p diffs))
-    ;; Sum up the last elements from bottom to top
-    (loop for s in sequences
-          sum (car (last s)))))
+(defun build-difference-pyramid (seq)
+  "Build the pyramid of difference sequences from SEQ down to all zeros.
+   Returns a list of sequences from the original down to a sequence of all zeros."
+  (loop for current = seq then (get-differences current)
+        collect current
+        until (all-zeros-p current)))
 
-(defun extrapolate-prev (seq)
-  "Extrapolate the previous value in the sequence."
-  (let ((sequences (list seq)))
-    ;; Build the pyramid of differences
-    (loop for current = seq then diffs
-          for diffs = (get-differences current)
-          do (push diffs sequences)
-          until (all-zeros-p diffs))
-    ;; Work from bottom to top, subtracting first elements
-    (let ((prev-first 0))
-      (dolist (s sequences prev-first)
-        (setf prev-first (- (first s) prev-first))))))
+(defun extrapolate-next (seq)
+  "Extrapolate the next value in the sequence.
+   Sum the last elements of each level in the difference pyramid."
+  (reduce #'+ (mapcar (lambda (s) (first (last s)))
+                      (build-difference-pyramid seq))))
 
 (defun part1 (histories)
   "Sum of all extrapolated next values."
   (reduce #'+ (mapcar #'extrapolate-next histories)))
 
 (defun part2 (histories)
-  "Sum of all extrapolated previous values."
-  (reduce #'+ (mapcar #'extrapolate-prev histories)))
+  "Sum of all extrapolated previous values.
+   Key insight: extrapolating backwards is equivalent to extrapolating forwards on the reversed sequence."
+  (reduce #'+ (mapcar (lambda (seq) (extrapolate-next (reverse seq))) histories)))
 
 (defun main ()
   (let* ((script-dir (directory-namestring *load-truename*))

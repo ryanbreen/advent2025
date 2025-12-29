@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <fstream>
 #include <iostream>
+#include <numeric>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -43,7 +44,7 @@ bool all_zeros(const Sequence& seq) {
     return std::all_of(seq.begin(), seq.end(), [](long long x) { return x == 0; });
 }
 
-long long extrapolate_next(Sequence seq) {
+long long extrapolate_next(const Sequence& seq) {
     std::vector<Sequence> sequences;
     sequences.push_back(seq);
 
@@ -51,53 +52,36 @@ long long extrapolate_next(Sequence seq) {
         sequences.push_back(get_differences(sequences.back()));
     }
 
-    // Work backwards, adding the last element of each level
-    for (int i = static_cast<int>(sequences.size()) - 2; i >= 0; --i) {
-        long long next_val = sequences[i].back() + sequences[i + 1].back();
-        sequences[i].push_back(next_val);
+    // Work backwards, summing the last element of each level
+    long long next_val = 0;
+    for (auto it = sequences.rbegin(); it != sequences.rend(); ++it) {
+        next_val += it->back();
     }
 
-    return sequences[0].back();
-}
-
-long long extrapolate_prev(Sequence seq) {
-    std::vector<Sequence> sequences;
-    sequences.push_back(seq);
-
-    while (!all_zeros(sequences.back())) {
-        sequences.push_back(get_differences(sequences.back()));
-    }
-
-    // Work backwards, computing the previous value at each level
-    for (int i = static_cast<int>(sequences.size()) - 2; i >= 0; --i) {
-        long long prev_val = sequences[i].front() - sequences[i + 1].front();
-        sequences[i].insert(sequences[i].begin(), prev_val);
-    }
-
-    return sequences[0].front();
+    return next_val;
 }
 
 long long part1(const Histories& histories) {
-    long long sum = 0;
-    for (const auto& history : histories) {
-        sum += extrapolate_next(history);
-    }
-    return sum;
+    return std::accumulate(histories.begin(), histories.end(), 0LL,
+        [](long long sum, const Sequence& seq) {
+            return sum + extrapolate_next(seq);
+        });
 }
 
 long long part2(const Histories& histories) {
-    long long sum = 0;
-    for (const auto& history : histories) {
-        sum += extrapolate_prev(history);
-    }
-    return sum;
+    // Part 2: extrapolate backwards = reverse sequence and extrapolate forwards
+    return std::accumulate(histories.begin(), histories.end(), 0LL,
+        [](long long sum, const Sequence& seq) {
+            Sequence reversed(seq.rbegin(), seq.rend());
+            return sum + extrapolate_next(reversed);
+        });
 }
 
 int main() {
-    auto histories = parse_input("../input.txt");
+    const auto histories = parse_input("../input.txt");
 
-    std::cout << "Part 1: " << part1(histories) << std::endl;
-    std::cout << "Part 2: " << part2(histories) << std::endl;
+    std::cout << "Part 1: " << part1(histories) << '\n';
+    std::cout << "Part 2: " << part2(histories) << '\n';
 
     return 0;
 }

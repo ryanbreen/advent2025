@@ -10,17 +10,17 @@ try {
         abort;
     }
 
-    // Read and parse input file into lines
+    // Read input file
     inputText = fileRead(inputPath).trim();
-    lines = listToArray(inputText, chr(10));
 
     /**
      * Parse input lines into arrays of integers
      * Each line contains space-separated integers
      *
+     * @param {array} lines - Array of input lines
      * @return {array} Array of arrays of integers (histories)
      */
-    function parseInput() {
+    function parseInput(lines) {
         var histories = [];
         for (var line in lines) {
             var nums = [];
@@ -68,70 +68,51 @@ try {
     }
 
     /**
+     * Create a reversed copy of an array
+     *
+     * @param {array} arr - Array to reverse
+     * @return {array} New array with elements in reverse order
+     */
+    function reverseArray(arr) {
+        var result = [];
+        var n = arrayLen(arr);
+        for (var i = n; i >= 1; i--) {
+            arrayAppend(result, arr[i]);
+        }
+        return result;
+    }
+
+    /**
      * Extrapolate the next value in the sequence
-     * Build difference pyramid until all zeros, then propagate back up
+     * Build difference pyramid until all zeros, then sum the last values
+     *
+     * Key insight: The extrapolated next value is simply the sum of all
+     * last values in the difference pyramid
      *
      * @param {array} seq - Original sequence
      * @return {numeric} The extrapolated next value
      */
     function extrapolateNext(seq) {
-        // Build list of sequences (difference pyramid)
-        var sequences = [duplicate(seq)];
         var current = seq;
+        var sum = 0;
 
         // Keep computing differences until we hit all zeros
+        // Accumulate the last value at each level
         while (!allZeros(current)) {
+            sum += current[arrayLen(current)];
             current = getDifferences(current);
-            arrayAppend(sequences, current);
         }
 
-        // Propagate back up: add last value of lower level to last value of current level
-        for (var i = arrayLen(sequences) - 1; i >= 1; i--) {
-            var lastOfLower = sequences[i + 1][arrayLen(sequences[i + 1])];
-            var lastOfCurrent = sequences[i][arrayLen(sequences[i])];
-            arrayAppend(sequences[i], lastOfCurrent + lastOfLower);
-        }
-
-        // Return the new last value of the original sequence
-        return sequences[1][arrayLen(sequences[1])];
-    }
-
-    /**
-     * Extrapolate the previous value in the sequence
-     * Build difference pyramid until all zeros, then propagate back up
-     *
-     * @param {array} seq - Original sequence
-     * @return {numeric} The extrapolated previous value
-     */
-    function extrapolatePrev(seq) {
-        // Build list of sequences (difference pyramid)
-        var sequences = [duplicate(seq)];
-        var current = seq;
-
-        // Keep computing differences until we hit all zeros
-        while (!allZeros(current)) {
-            current = getDifferences(current);
-            arrayAppend(sequences, current);
-        }
-
-        // Propagate back up: subtract first value of lower level from first value of current level
-        for (var i = arrayLen(sequences) - 1; i >= 1; i--) {
-            var firstOfLower = sequences[i + 1][1];
-            var firstOfCurrent = sequences[i][1];
-            arrayPrepend(sequences[i], firstOfCurrent - firstOfLower);
-        }
-
-        // Return the new first value of the original sequence
-        return sequences[1][1];
+        return sum;
     }
 
     /**
      * Part 1: Sum of all extrapolated next values
      *
+     * @param {array} histories - Parsed input histories
      * @return {numeric} Sum of extrapolated next values
      */
-    function part1() {
-        var histories = parseInput();
+    function part1(histories) {
         var total = 0;
         for (var h in histories) {
             total += extrapolateNext(h);
@@ -142,20 +123,28 @@ try {
     /**
      * Part 2: Sum of all extrapolated previous values
      *
+     * Key insight: Extrapolating backwards is equivalent to
+     * extrapolating forwards on the reversed sequence
+     *
+     * @param {array} histories - Parsed input histories
      * @return {numeric} Sum of extrapolated previous values
      */
-    function part2() {
-        var histories = parseInput();
+    function part2(histories) {
         var total = 0;
         for (var h in histories) {
-            total += extrapolatePrev(h);
+            // Reverse the sequence and extrapolate forward
+            total += extrapolateNext(reverseArray(h));
         }
         return total;
     }
 
+    // Parse input once and reuse
+    lines = listToArray(inputText, chr(10));
+    histories = parseInput(lines);
+
     // Execute both parts and display results
-    echo("Part 1: " & part1() & chr(10));
-    echo("Part 2: " & part2() & chr(10));
+    echo("Part 1: " & part1(histories) & chr(10));
+    echo("Part 2: " & part2(histories) & chr(10));
 
 } catch (any e) {
     // Graceful error handling with detailed error information

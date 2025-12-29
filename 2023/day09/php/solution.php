@@ -1,23 +1,46 @@
 <?php
 
-$inputText = trim(file_get_contents(__DIR__ . '/../input.txt'));
+declare(strict_types=1);
 
-function parseInput(string $text): array {
-    $lines = explode("\n", $text);
-    return array_map(function($line) {
-        return array_map('intval', preg_split('/\s+/', trim($line)));
-    }, $lines);
+/**
+ * Parse input text into array of integer sequences.
+ *
+ * @param string $text Raw input text
+ * @return array<array<int>> Array of integer sequences
+ */
+function parseInput(string $text): array
+{
+    $lines = explode("\n", trim($text));
+    return array_map(
+        fn(string $line): array => array_map('intval', preg_split('/\s+/', trim($line))),
+        $lines
+    );
 }
 
-function getDifferences(array $seq): array {
+/**
+ * Compute pairwise differences of a sequence.
+ *
+ * @param array<int> $seq Input sequence
+ * @return array<int> Differences between consecutive elements
+ */
+function getDifferences(array $seq): array
+{
     $diffs = [];
-    for ($i = 0; $i < count($seq) - 1; $i++) {
+    $count = count($seq);
+    for ($i = 0; $i < $count - 1; $i++) {
         $diffs[] = $seq[$i + 1] - $seq[$i];
     }
     return $diffs;
 }
 
-function allZeros(array $seq): bool {
+/**
+ * Check if all elements in sequence are zero.
+ *
+ * @param array<int> $seq Input sequence
+ * @return bool True if all elements are zero
+ */
+function allZeros(array $seq): bool
+{
     foreach ($seq as $val) {
         if ($val !== 0) {
             return false;
@@ -26,7 +49,17 @@ function allZeros(array $seq): bool {
     return true;
 }
 
-function extrapolateNext(array $seq): int {
+/**
+ * Extrapolate the next value in a sequence using difference method.
+ *
+ * Builds a pyramid of differences until reaching all zeros,
+ * then works back up adding the last elements.
+ *
+ * @param array<int> $seq Input sequence
+ * @return int The extrapolated next value
+ */
+function extrapolateNext(array $seq): int
+{
     $sequences = [$seq];
     $current = $seq;
 
@@ -36,45 +69,57 @@ function extrapolateNext(array $seq): int {
     }
 
     for ($i = count($sequences) - 2; $i >= 0; $i--) {
-        $sequences[$i][] = $sequences[$i][count($sequences[$i]) - 1] + $sequences[$i + 1][count($sequences[$i + 1]) - 1];
+        $lastCurrent = end($sequences[$i]);
+        $lastBelow = end($sequences[$i + 1]);
+        $sequences[$i][] = $lastCurrent + $lastBelow;
     }
 
-    return $sequences[0][count($sequences[0]) - 1];
+    return end($sequences[0]);
 }
 
-function extrapolatePrev(array $seq): int {
-    $sequences = [$seq];
-    $current = $seq;
-
-    while (!allZeros($current)) {
-        $current = getDifferences($current);
-        $sequences[] = $current;
-    }
-
-    for ($i = count($sequences) - 2; $i >= 0; $i--) {
-        array_unshift($sequences[$i], $sequences[$i][0] - $sequences[$i + 1][0]);
-    }
-
-    return $sequences[0][0];
+/**
+ * Sum results of applying a function to each element.
+ *
+ * @param callable $fn Function to apply
+ * @param array $items Items to process
+ * @return int Sum of results
+ */
+function sumBy(callable $fn, array $items): int
+{
+    return array_sum(array_map($fn, $items));
 }
 
+/**
+ * Part 1: Sum of extrapolated next values for all sequences.
+ *
+ * @param array<array<int>> $histories Input sequences
+ * @return int Sum of extrapolated values
+ */
+function part1(array $histories): int
+{
+    return sumBy(fn(array $h): int => extrapolateNext($h), $histories);
+}
+
+/**
+ * Part 2: Sum of extrapolated previous values for all sequences.
+ *
+ * Key insight: Extrapolating backwards is equivalent to
+ * extrapolating forwards on the reversed sequence.
+ *
+ * @param array<array<int>> $histories Input sequences
+ * @return int Sum of extrapolated values
+ */
+function part2(array $histories): int
+{
+    return sumBy(
+        fn(array $h): int => extrapolateNext(array_reverse($h)),
+        $histories
+    );
+}
+
+// Main execution
+$inputText = file_get_contents(__DIR__ . '/../input.txt');
 $histories = parseInput($inputText);
-
-function part1(array $histories): int {
-    $sum = 0;
-    foreach ($histories as $history) {
-        $sum += extrapolateNext($history);
-    }
-    return $sum;
-}
-
-function part2(array $histories): int {
-    $sum = 0;
-    foreach ($histories as $history) {
-        $sum += extrapolatePrev($history);
-    }
-    return $sum;
-}
 
 echo "Part 1: " . part1($histories) . "\n";
 echo "Part 2: " . part2($histories) . "\n";
