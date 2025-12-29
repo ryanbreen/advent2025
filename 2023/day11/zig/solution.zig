@@ -42,26 +42,18 @@ pub fn main() !void {
         }
     }
 
-    // Find empty rows
-    var empty_rows = std.AutoHashMap(usize, void).init(allocator);
-    defer empty_rows.deinit();
+    // Find empty rows using a boolean slice (more memory-efficient than HashMap)
+    const empty_rows = try allocator.alloc(bool, rows);
+    defer allocator.free(empty_rows);
 
     for (0..rows) |r| {
-        var has_galaxy = false;
-        for (grid[r]) |ch| {
-            if (ch == '#') {
-                has_galaxy = true;
-                break;
-            }
-        }
-        if (!has_galaxy) {
-            try empty_rows.put(r, {});
-        }
+        // Use indexOfScalar to check if '#' exists in the row
+        empty_rows[r] = std.mem.indexOfScalar(u8, grid[r], '#') == null;
     }
 
-    // Find empty columns
-    var empty_cols = std.AutoHashMap(usize, void).init(allocator);
-    defer empty_cols.deinit();
+    // Find empty columns using a boolean slice
+    const empty_cols = try allocator.alloc(bool, cols);
+    defer allocator.free(empty_cols);
 
     for (0..cols) |c| {
         var has_galaxy = false;
@@ -71,16 +63,14 @@ pub fn main() !void {
                 break;
             }
         }
-        if (!has_galaxy) {
-            try empty_cols.put(c, {});
-        }
+        empty_cols[c] = !has_galaxy;
     }
 
     // Calculate distances for Part 1 (expansion factor = 2)
-    const part1 = calculateDistances(galaxies.items, &empty_rows, &empty_cols, 2);
+    const part1 = calculateDistances(galaxies.items, empty_rows, empty_cols, 2);
 
     // Calculate distances for Part 2 (expansion factor = 1,000,000)
-    const part2 = calculateDistances(galaxies.items, &empty_rows, &empty_cols, 1_000_000);
+    const part2 = calculateDistances(galaxies.items, empty_rows, empty_cols, 1_000_000);
 
     std.debug.print("Part 1: {}\n", .{part1});
     std.debug.print("Part 2: {}\n", .{part2});
@@ -88,8 +78,8 @@ pub fn main() !void {
 
 fn calculateDistances(
     galaxies: []const Galaxy,
-    empty_rows: *const std.AutoHashMap(usize, void),
-    empty_cols: *const std.AutoHashMap(usize, void),
+    empty_rows: []const bool,
+    empty_cols: []const bool,
     expansion_factor: u64,
 ) u64 {
     var total: u64 = 0;
@@ -106,7 +96,10 @@ fn calculateDistances(
             var row_dist: u64 = max_r - min_r;
 
             for (min_r..max_r) |r| {
-                if (empty_rows.contains(r)) {
+                if (empty_rows[r]) {
+                    // Each empty row/col expands by expansion_factor. We already counted it
+                    // once in the base distance (max_r - min_r), so we add (expansion_factor - 1)
+                    // additional steps to account for the expansion.
                     row_dist += expansion_factor - 1;
                 }
             }
@@ -117,7 +110,8 @@ fn calculateDistances(
             var col_dist: u64 = max_c - min_c;
 
             for (min_c..max_c) |c| {
-                if (empty_cols.contains(c)) {
+                if (empty_cols[c]) {
+                    // Same logic: add (expansion_factor - 1) for each empty column crossed
                     col_dist += expansion_factor - 1;
                 }
             }
