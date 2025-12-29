@@ -39,7 +39,7 @@ func countArrangements(pattern string, groups []int) int64 {
 			return 0
 		}
 
-		var result int64 = 0
+		var result int64
 		char := pattern[pos]
 
 		// Option 1: Place operational spring (.)
@@ -78,7 +78,11 @@ func parseLine(line string) (string, []int) {
 	groupStrs := strings.Split(parts[1], ",")
 	groups := make([]int, len(groupStrs))
 	for i, s := range groupStrs {
-		groups[i], _ = strconv.Atoi(s)
+		var err error
+		groups[i], err = strconv.Atoi(s)
+		if err != nil {
+			panic(fmt.Sprintf("invalid group number: %s", s))
+		}
 	}
 
 	return pattern, groups
@@ -101,7 +105,7 @@ func unfold(pattern string, groups []int) (string, []int) {
 }
 
 func part1(lines []string) int64 {
-	var total int64 = 0
+	var total int64
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -114,7 +118,7 @@ func part1(lines []string) int64 {
 }
 
 func part2(lines []string) int64 {
-	var total int64 = 0
+	var total int64
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {

@@ -9,10 +9,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <inttypes.h>
 
 #define MAX_PATTERN_LEN 128
 #define MAX_GROUPS 64
 #define MAX_RUN_LEN 32
+#define UNFOLD_FACTOR 5
 
 /* Memoization table: -1 means not computed yet */
 static int64_t memo[MAX_PATTERN_LEN][MAX_GROUPS][MAX_RUN_LEN];
@@ -99,11 +101,11 @@ static int parse_line(const char *line) {
 
     /* Parse groups */
     num_groups = 0;
-    const char *p = space + 1;
+    char *p = (char *)(space + 1);
     while (*p && *p != '\n' && *p != '\r') {
         if (num_groups >= MAX_GROUPS)
             return 0;
-        groups[num_groups++] = (int)strtol(p, (char **)&p, 10);
+        groups[num_groups++] = (int)strtol(p, &p, 10);
         if (*p == ',')
             p++;
     }
@@ -126,7 +128,7 @@ static void unfold(void) {
 
     /* Build unfolded pattern: pattern?pattern?pattern?pattern?pattern */
     pattern_len = 0;
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < UNFOLD_FACTOR; i++) {
         if (i > 0)
             pattern[pattern_len++] = '?';
         memcpy(pattern + pattern_len, orig_pattern, orig_plen);
@@ -136,7 +138,7 @@ static void unfold(void) {
 
     /* Build unfolded groups */
     num_groups = 0;
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < UNFOLD_FACTOR; i++) {
         memcpy(groups + num_groups, orig_groups, orig_ngroups * sizeof(int));
         num_groups += orig_ngroups;
     }
@@ -173,8 +175,8 @@ int main(void) {
 
     fclose(fp);
 
-    printf("Part 1: %lld\n", (long long)part1_total);
-    printf("Part 2: %lld\n", (long long)part2_total);
+    printf("Part 1: %" PRId64 "\n", part1_total);
+    printf("Part 2: %" PRId64 "\n", part2_total);
 
     return 0;
 }

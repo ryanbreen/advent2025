@@ -10,7 +10,7 @@ fn countArrangements(pattern: []const u8, groups: []const u8, allocator: std.mem
     var memo = std.AutoHashMap(State, u64).init(allocator);
     defer memo.deinit();
 
-    return dp(pattern, groups, 0, 0, 0, &memo);
+    return try dp(pattern, groups, 0, 0, 0, &memo);
 }
 
 fn dp(
@@ -20,7 +20,7 @@ fn dp(
     group_idx: u8,
     current_run: u8,
     memo: *std.AutoHashMap(State, u64),
-) u64 {
+) !u64 {
     const state = State{ .pos = pos, .group_idx = group_idx, .current_run = current_run };
 
     // Check memo
@@ -39,7 +39,7 @@ fn dp(
         else if (group_idx == groups.len - 1 and groups[group_idx] == current_run) {
             result = 1;
         }
-        memo.put(state, result) catch {};
+        try memo.put(state, result);
         return result;
     }
 
@@ -50,10 +50,10 @@ fn dp(
     if (char == '.' or char == '?') {
         if (current_run == 0) {
             // No active run, just move forward
-            result += dp(pattern, groups, pos + 1, group_idx, 0, memo);
+            result += try dp(pattern, groups, pos + 1, group_idx, 0, memo);
         } else if (group_idx < groups.len and groups[group_idx] == current_run) {
             // End current run if it matches expected group size
-            result += dp(pattern, groups, pos + 1, group_idx + 1, 0, memo);
+            result += try dp(pattern, groups, pos + 1, group_idx + 1, 0, memo);
         }
         // Otherwise invalid (run doesn't match group)
     }
@@ -62,24 +62,18 @@ fn dp(
     if (char == '#' or char == '?') {
         if (group_idx < groups.len and current_run < groups[group_idx]) {
             // Can extend current run
-            result += dp(pattern, groups, pos + 1, group_idx, current_run + 1, memo);
+            result += try dp(pattern, groups, pos + 1, group_idx, current_run + 1, memo);
         }
         // Otherwise invalid (exceeds group size or no more groups)
     }
 
-    memo.put(state, result) catch {};
+    try memo.put(state, result);
     return result;
 }
 
 fn parseLine(line: []const u8, groups_buf: []u8) !struct { pattern: []const u8, groups: []const u8 } {
     // Find the space separating pattern from groups
-    var space_idx: usize = 0;
-    for (line, 0..) |c, i| {
-        if (c == ' ') {
-            space_idx = i;
-            break;
-        }
-    }
+    const space_idx = std.mem.indexOfScalar(u8, line, ' ') orelse return error.InvalidFormat;
 
     const pattern = line[0..space_idx];
     const groups_str = line[space_idx + 1 ..];

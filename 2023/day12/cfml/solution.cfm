@@ -14,9 +14,9 @@ fileContent = fileRead(inputPath);
 lines = listToArray(fileContent, chr(10));
 
 // Clean up carriage returns
-for (i = 1; i <= arrayLen(lines); i++) {
-    lines[i] = replace(lines[i], chr(13), "", "all");
-}
+lines.each(function(line, idx) {
+    lines[idx] = replace(line, chr(13), "", "all");
+});
 
 /**
  * Recursive DP function with memoization.
@@ -104,12 +104,9 @@ function countArrangements(required string pattern, required array groups) {
 function parseLine(required string line) {
     var parts = listToArray(trim(line), " ");
     var pattern = parts[1];
-    var groupParts = listToArray(parts[2], ",");
-    var groups = [];
-
-    for (var g in groupParts) {
-        arrayAppend(groups, val(g));
-    }
+    var groups = listToArray(parts[2], ",").map(function(g) {
+        return val(g);
+    });
 
     return {pattern: pattern, groups: groups};
 }

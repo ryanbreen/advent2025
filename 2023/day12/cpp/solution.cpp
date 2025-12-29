@@ -6,6 +6,8 @@
 #include <unordered_map>
 #include <cstdint>
 
+constexpr int UNFOLD_FACTOR = 5;
+
 struct State {
     int pos;
     int group_idx;
@@ -28,11 +30,15 @@ class ArrangementCounter {
 private:
     const std::string& pattern;
     const std::vector<int>& groups;
+    const int pattern_size;
+    const int groups_size;
     std::unordered_map<State, int64_t, StateHash> memo;
 
 public:
     ArrangementCounter(const std::string& p, const std::vector<int>& g)
-        : pattern(p), groups(g) {}
+        : pattern(p), groups(g),
+          pattern_size(static_cast<int>(p.size())),
+          groups_size(static_cast<int>(g.size())) {}
 
     int64_t count() {
         memo.clear();
@@ -42,13 +48,13 @@ public:
 private:
     int64_t dp(int pos, int group_idx, int current_run) {
         // Base case: reached end of pattern
-        if (pos == static_cast<int>(pattern.size())) {
+        if (pos == pattern_size) {
             // Valid if we've matched all groups and no partial run
-            if (group_idx == static_cast<int>(groups.size()) && current_run == 0) {
+            if (group_idx == groups_size && current_run == 0) {
                 return 1;
             }
             // Or if we're on the last group and the run matches
-            if (group_idx == static_cast<int>(groups.size()) - 1 &&
+            if (group_idx == groups_size - 1 &&
                 groups[group_idx] == current_run) {
                 return 1;
             }
@@ -69,7 +75,7 @@ private:
             if (current_run == 0) {
                 // No active run, just move forward
                 result += dp(pos + 1, group_idx, 0);
-            } else if (group_idx < static_cast<int>(groups.size()) &&
+            } else if (group_idx < groups_size &&
                        groups[group_idx] == current_run) {
                 // End current run if it matches expected group size
                 result += dp(pos + 1, group_idx + 1, 0);
@@ -79,7 +85,7 @@ private:
 
         // Option 2: Place damaged spring (#)
         if (c == '#' || c == '?') {
-            if (group_idx < static_cast<int>(groups.size()) &&
+            if (group_idx < groups_size &&
                 current_run < groups[group_idx]) {
                 // Can extend current run
                 result += dp(pos + 1, group_idx, current_run + 1);
@@ -110,14 +116,16 @@ std::pair<std::string, std::vector<int>> parse_line(const std::string& line) {
 
 std::pair<std::string, std::vector<int>> unfold(const std::string& pattern,
                                                  const std::vector<int>& groups,
-                                                 int times = 5) {
+                                                 int times = UNFOLD_FACTOR) {
     std::string unfolded_pattern;
+    unfolded_pattern.reserve(pattern.size() * times + times - 1);
     for (int i = 0; i < times; i++) {
         if (i > 0) unfolded_pattern += '?';
         unfolded_pattern += pattern;
     }
 
     std::vector<int> unfolded_groups;
+    unfolded_groups.reserve(groups.size() * times);
     for (int i = 0; i < times; i++) {
         unfolded_groups.insert(unfolded_groups.end(), groups.begin(), groups.end());
     }

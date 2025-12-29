@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  * Advent of Code 2023 Day 12: Hot Springs
  *
@@ -8,6 +10,10 @@
 /**
  * Count valid arrangements using memoized dynamic programming.
  * State: (position, group_index, current_run_length)
+ *
+ * @param string $pattern The spring pattern with ., #, and ? characters
+ * @param array<int> $groups Expected contiguous damaged spring group sizes
+ * @return int Number of valid arrangements
  */
 function countArrangements(string $pattern, array $groups): int {
     $memo = [];
@@ -67,6 +73,9 @@ function countArrangements(string $pattern, array $groups): int {
 
 /**
  * Parse a line into pattern and groups array.
+ *
+ * @param string $line Input line in format "pattern group1,group2,..."
+ * @return array{0: string, 1: array<int>} Tuple of pattern and groups array
  */
 function parseLine(string $line): array {
     $parts = preg_split('/\s+/', trim($line));
@@ -77,6 +86,9 @@ function parseLine(string $line): array {
 
 /**
  * Part 1: Sum of arrangement counts for all rows.
+ *
+ * @param array<string> $lines Input lines from puzzle input
+ * @return int Total number of valid arrangements
  */
 function part1(array $lines): int {
     $total = 0;
@@ -93,18 +105,22 @@ function part1(array $lines): int {
 
 /**
  * Unfold pattern and groups by repeating them 5 times.
+ *
+ * @param string $pattern Original spring pattern
+ * @param array<int> $groups Original group sizes
+ * @return array{0: string, 1: array<int>} Tuple of unfolded pattern and groups
  */
 function unfold(string $pattern, array $groups): array {
     $unfoldedPattern = implode('?', array_fill(0, 5, $pattern));
-    $unfoldedGroups = [];
-    for ($i = 0; $i < 5; $i++) {
-        $unfoldedGroups = array_merge($unfoldedGroups, $groups);
-    }
+    $unfoldedGroups = array_merge(...array_fill(0, 5, $groups));
     return [$unfoldedPattern, $unfoldedGroups];
 }
 
 /**
  * Part 2: Sum of arrangement counts for all rows after unfolding.
+ *
+ * @param array<string> $lines Input lines from puzzle input
+ * @return int Total number of valid arrangements after unfolding
  */
 function part2(array $lines): int {
     $total = 0;

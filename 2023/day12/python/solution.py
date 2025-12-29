@@ -2,6 +2,7 @@
 """Advent of Code 2023 Day 12: Hot Springs"""
 
 from functools import lru_cache
+from pathlib import Path
 
 
 def count_arrangements(pattern: str, groups: tuple[int, ...]) -> int:
@@ -29,7 +30,7 @@ def count_arrangements(pattern: str, groups: tuple[int, ...]) -> int:
         char = pattern[pos]
 
         # Option 1: Place operational spring (.)
-        if char == '.' or char == '?':
+        if char in '.?':
             if current_run == 0:
                 # No active run, just move forward
                 result += dp(pos + 1, group_idx, 0)
@@ -39,7 +40,7 @@ def count_arrangements(pattern: str, groups: tuple[int, ...]) -> int:
             # Otherwise invalid (run doesn't match group)
 
         # Option 2: Place damaged spring (#)
-        if char == '#' or char == '?':
+        if char in '#?':
             if group_idx < len(groups) and current_run < groups[group_idx]:
                 # Can extend current run
                 result += dp(pos + 1, group_idx, current_run + 1)
@@ -54,7 +55,7 @@ def parse_line(line: str) -> tuple[str, tuple[int, ...]]:
     """Parse a line into pattern and groups."""
     parts = line.strip().split()
     pattern = parts[0]
-    groups = tuple(int(x) for x in parts[1].split(','))
+    groups = tuple(map(int, parts[1].split(',')))
     return pattern, groups
 
 
@@ -89,8 +90,7 @@ def part2(lines: list[str]) -> int:
 
 
 def main():
-    with open('../input.txt', 'r') as f:
-        lines = f.readlines()
+    lines = Path(__file__).parent.joinpath('../input.txt').read_text().splitlines()
 
     print(f"Part 1: {part1(lines)}")
     print(f"Part 2: {part2(lines)}")

@@ -1,9 +1,15 @@
 #!/usr/bin/env perl
 # Advent of Code 2023 Day 12: Hot Springs
 
+use v5.16;
 use strict;
 use warnings;
+use feature 'say';
 no warnings 'recursion';
+
+use List::Util qw(sum0);
+
+use constant UNFOLD_FACTOR => 5;
 
 my %memo;
 
@@ -76,32 +82,26 @@ sub parse_line {
 
 sub unfold {
     my ($pattern, $groups) = @_;
-    my $unfolded_pattern = join('?', ($pattern) x 5);
-    my @unfolded_groups = (@$groups) x 5;
+    my $unfolded_pattern = join('?', ($pattern) x UNFOLD_FACTOR);
+    my @unfolded_groups = (@$groups) x UNFOLD_FACTOR;
     return ($unfolded_pattern, \@unfolded_groups);
 }
 
 sub part1 {
     my ($lines) = @_;
-    my $total = 0;
-    for my $line (@$lines) {
-        next if $line =~ /^\s*$/;
-        my ($pattern, $groups) = parse_line($line);
-        $total += count_arrangements($pattern, $groups);
-    }
-    return $total;
+    return sum0 map {
+        my ($pattern, $groups) = parse_line($_);
+        count_arrangements($pattern, $groups);
+    } grep { !/^\s*$/ } @$lines;
 }
 
 sub part2 {
     my ($lines) = @_;
-    my $total = 0;
-    for my $line (@$lines) {
-        next if $line =~ /^\s*$/;
-        my ($pattern, $groups) = parse_line($line);
+    return sum0 map {
+        my ($pattern, $groups) = parse_line($_);
         my ($unfolded_pattern, $unfolded_groups) = unfold($pattern, $groups);
-        $total += count_arrangements($unfolded_pattern, $unfolded_groups);
-    }
-    return $total;
+        count_arrangements($unfolded_pattern, $unfolded_groups);
+    } grep { !/^\s*$/ } @$lines;
 }
 
 sub main {
@@ -109,8 +109,8 @@ sub main {
     my @lines = <$fh>;
     close($fh);
 
-    print "Part 1: " . part1(\@lines) . "\n";
-    print "Part 2: " . part2(\@lines) . "\n";
+    say "Part 1: " . part1(\@lines);
+    say "Part 2: " . part2(\@lines);
 }
 
 main();

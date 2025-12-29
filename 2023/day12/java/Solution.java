@@ -1,26 +1,27 @@
-import java.io.BufferedReader;
-import java.io.FileReader;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class Solution {
 
-    private Map<String, Long> memo;
+    // Records for type safety
+    record State(int pos, int groupIdx, int currentRun) {}
+    record SpringRecord(String pattern, int[] groups) {}
+
+    private final Map<State, Long> memo = new HashMap<>();
     private String pattern;
     private int[] groups;
 
-    public Solution() {
-        this.memo = new HashMap<>();
-    }
-
     private long dp(int pos, int groupIdx, int currentRun) {
-        // Create memoization key
-        String key = pos + "," + groupIdx + "," + currentRun;
-        if (memo.containsKey(key)) {
-            return memo.get(key);
+        var state = new State(pos, groupIdx, currentRun);
+        var cached = memo.get(state);
+        if (cached != null) {
+            return cached;
         }
 
         // Base case: reached end of pattern
@@ -37,7 +38,7 @@ public class Solution {
         }
 
         long result = 0;
-        char c = pattern.charAt(pos);
+        var c = pattern.charAt(pos);
 
         // Option 1: Place operational spring (.)
         if (c == '.' || c == '?') {
@@ -60,7 +61,7 @@ public class Solution {
             // Otherwise invalid (exceeds group size or no more groups)
         }
 
-        memo.put(key, result);
+        memo.put(state, result);
         return result;
     }
 
@@ -72,62 +73,49 @@ public class Solution {
     }
 
     private static int[] parseGroups(String groupStr) {
-        String[] parts = groupStr.split(",");
-        int[] groups = new int[parts.length];
-        for (int i = 0; i < parts.length; i++) {
-            groups[i] = Integer.parseInt(parts[i]);
-        }
-        return groups;
+        return Arrays.stream(groupStr.split(","))
+                .mapToInt(Integer::parseInt)
+                .toArray();
     }
 
     private static String unfoldPattern(String pattern, int times) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < times; i++) {
-            if (i > 0) sb.append('?');
-            sb.append(pattern);
-        }
-        return sb.toString();
+        return String.join("?", Collections.nCopies(times, pattern));
     }
 
     private static int[] unfoldGroups(int[] groups, int times) {
-        int[] unfolded = new int[groups.length * times];
-        for (int i = 0; i < times; i++) {
+        var unfolded = new int[groups.length * times];
+        for (var i = 0; i < times; i++) {
             System.arraycopy(groups, 0, unfolded, i * groups.length, groups.length);
         }
         return unfolded;
     }
 
+    private static SpringRecord parseLine(String line) {
+        var parts = line.trim().split("\\s+");
+        return new SpringRecord(parts[0], parseGroups(parts[1]));
+    }
+
     public static void main(String[] args) throws IOException {
-        List<String[]> records = new ArrayList<>();
+        List<SpringRecord> records = Files.readAllLines(Path.of("../input.txt"))
+                .stream()
+                .filter(line -> !line.isBlank())
+                .map(Solution::parseLine)
+                .toList();
 
-        try (BufferedReader reader = new BufferedReader(new FileReader("../input.txt"))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                line = line.trim();
-                if (line.isEmpty()) continue;
-                String[] parts = line.split("\\s+");
-                records.add(parts);
-            }
-        }
-
-        Solution solver = new Solution();
+        var solver = new Solution();
 
         // Part 1
-        long part1 = 0;
-        for (String[] record : records) {
-            String pattern = record[0];
-            int[] groups = parseGroups(record[1]);
-            part1 += solver.countArrangements(pattern, groups);
-        }
+        var part1 = records.stream()
+                .mapToLong(r -> solver.countArrangements(r.pattern(), r.groups()))
+                .sum();
         System.out.println("Part 1: " + part1);
 
         // Part 2
-        long part2 = 0;
-        for (String[] record : records) {
-            String pattern = unfoldPattern(record[0], 5);
-            int[] groups = unfoldGroups(parseGroups(record[1]), 5);
-            part2 += solver.countArrangements(pattern, groups);
-        }
+        var part2 = records.stream()
+                .mapToLong(r -> solver.countArrangements(
+                        unfoldPattern(r.pattern(), 5),
+                        unfoldGroups(r.groups(), 5)))
+                .sum();
         System.out.println("Part 2: " + part2);
     }
 }

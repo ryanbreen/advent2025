@@ -20,10 +20,6 @@
                                     (split-string groups-str #\,)))))
     (cons pattern groups)))
 
-(defun make-memo-key (pos group-idx current-run)
-  "Create a hash key from the DP state."
-  (list pos group-idx current-run))
-
 (defun count-arrangements (pattern groups)
   "Count valid arrangements using memoized DP."
   (let ((memo (make-hash-table :test 'equal))
@@ -32,15 +28,12 @@
         (num-groups (length groups)))
     (labels ((dp (pos group-idx current-run)
                "DP: position in pattern, current group index, length of current run."
-               (let ((key (make-memo-key pos group-idx current-run)))
-                 ;; Check memo
+               (let ((key (list pos group-idx current-run)))
                  (multiple-value-bind (cached found) (gethash key memo)
                    (if found
                        cached
-                       ;; Compute and store
-                       (let ((result (compute-dp pos group-idx current-run)))
-                         (setf (gethash key memo) result)
-                         result)))))
+                       (setf (gethash key memo)
+                             (compute-dp pos group-idx current-run))))))
 
              (compute-dp (pos group-idx current-run)
                "Compute DP value for given state."
@@ -93,20 +86,14 @@
 (defun part1 (lines)
   "Sum of arrangement counts for all rows."
   (loop for line in lines
-        for parsed = (parse-line line)
-        for pattern = (car parsed)
-        for groups = (cdr parsed)
+        for (pattern . groups) = (parse-line line)
         sum (count-arrangements pattern groups)))
 
 (defun part2 (lines)
   "Sum of arrangement counts for all rows after unfolding."
   (loop for line in lines
-        for parsed = (parse-line line)
-        for pattern = (car parsed)
-        for groups = (cdr parsed)
-        for unfolded = (unfold pattern groups)
-        for unfolded-pattern = (car unfolded)
-        for unfolded-groups = (cdr unfolded)
+        for (pattern . groups) = (parse-line line)
+        for (unfolded-pattern . unfolded-groups) = (unfold pattern groups)
         sum (count-arrangements unfolded-pattern unfolded-groups)))
 
 (defun main ()

@@ -1,151 +1,198 @@
 #!/usr/bin/env bash
 # Advent of Code 2023 Day 12: Hot Springs
-# Iterative DP approach (avoids subshell spawning for performance)
+#
+# This solution uses a memoized dynamic programming approach to count valid
+# arrangements of operational (.) and damaged (#) springs matching group patterns.
+#
+# DESIGN NOTE: Stack-Based Iterative DP
+# =====================================
+# Bash has a severe performance limitation: subshells. Each $(...) command
+# substitution spawns a new process, making recursive solutions prohibitively
+# slow (O(n) process spawns per recursion depth).
+#
+# To avoid this, we simulate recursion using an explicit stack:
+# - Instead of recursive function calls, we push work items onto a stack array
+# - Instead of return values, we store results in an associative array
+# - When a computation needs sub-results, it re-pushes itself to wait, then
+#   pushes the sub-computations
+#
+# This achieves true memoization within a single process, making the solution
+# feasible for Part 2's unfolded patterns.
 
-# Global variables for current problem
-declare -a groups
-declare -A memo
-pattern=""
-pattern_len=0
-num_groups=0
+# Global variables for current problem instance
+# These are set per-line to avoid passing large arrays through the stack
+declare -a groups          # Array of group sizes (e.g., [1, 1, 3])
+declare -A memo            # Memoization cache: "pos,group_idx,run" -> count
+pattern_str=""             # Current pattern string (e.g., "???.###")
+pattern_len=0              # Length of pattern_str
+num_groups=0               # Number of groups
 
-# Count arrangements using memoized iterative DP
-# Uses a stack-based approach to avoid subshell spawning
+# Count valid arrangements using memoized iterative DP
+#
+# DP State: (position, group_idx, current_run)
+#   - position:    Current index in pattern_str (0 to pattern_len)
+#   - group_idx:   Index of the group we're currently filling (0 to num_groups)
+#   - current_run: Length of the current contiguous run of '#' characters
+#
+# Transitions:
+#   - On '.' (or '?' treated as '.'): End current run if it matches group size
+#   - On '#' (or '?' treated as '#'): Extend current run if within group limit
+#
+# Base case: At end of pattern, valid if all groups are satisfied
 count_arrangements_iterative() {
-    local pat="$1"
-    local groups_str="$2"
+    local input_pattern="$1"
+    local groups_csv="$2"
 
-    # Set globals
-    pattern="$pat"
-    pattern_len=${#pattern}
-    IFS=',' read -ra groups <<< "$groups_str"
+    # Initialize global state for this problem instance
+    pattern_str="$input_pattern"
+    pattern_len=${#pattern_str}
+    IFS=',' read -ra groups <<< "$groups_csv"
     num_groups=${#groups[@]}
     memo=()
 
-    # Use stack-based simulation of recursion
+    # Stack-based recursion simulation
     # Stack entries: "pos,group_idx,current_run,return_slot"
-    # Results stored in result_stack array
+    #   - return_slot: Key where this computation should store its result
     declare -a stack
     declare -A results
     local stack_idx=0
-    local result_id=0
 
-    # Push initial call
+    # Variables declared at function scope (not inside loops)
+    local entry position group_idx current_run return_slot
+    local state_key character
+    local dot_result_key hash_result_key
+    local have_dot have_hash need_dot need_hash
+    local sub_state_key final_result base_case_value
+
+    # Push initial call: start at position 0, group 0, no current run
     stack[stack_idx]="0,0,0,main"
     ((stack_idx++))
 
     while (( stack_idx > 0 )); do
+        # Pop top of stack
         ((stack_idx--))
-        local entry="${stack[$stack_idx]}"
-        IFS=',' read -r pos group_idx current_run return_slot <<< "$entry"
+        entry="${stack[$stack_idx]}"
+        IFS=',' read -r position group_idx current_run return_slot <<< "$entry"
 
-        local key="${pos},${group_idx},${current_run}"
+        state_key="${position},${group_idx},${current_run}"
 
-        # Check if already computed
-        if [[ -v memo["$key"] ]]; then
-            results["$return_slot"]="${memo[$key]}"
+        # Check memoization cache
+        if [[ -v memo["$state_key"] ]]; then
+            results["$return_slot"]="${memo[$state_key]}"
             continue
         fi
 
         # Base case: reached end of pattern
-        if (( pos == pattern_len )); then
-            local val=0
+        if (( position == pattern_len )); then
+            base_case_value=0
+            # Valid if: all groups consumed and no pending run
             if (( group_idx == num_groups && current_run == 0 )); then
-                val=1
+                base_case_value=1
+            # Valid if: on last group and current run exactly matches it
             elif (( group_idx == num_groups - 1 && num_groups > 0 && groups[group_idx] == current_run )); then
-                val=1
+                base_case_value=1
             fi
-            memo["$key"]="$val"
-            results["$return_slot"]="$val"
+            memo["$state_key"]="$base_case_value"
+            results["$return_slot"]="$base_case_value"
             continue
         fi
 
-        local char="${pattern:$pos:1}"
+        character="${pattern_str:$position:1}"
 
-        # Check if we need to compute sub-results or aggregate them
-        local dot_key="${return_slot}_dot"
-        local hash_key="${return_slot}_hash"
+        # Keys for storing sub-computation results
+        dot_result_key="${return_slot}_dot"
+        hash_result_key="${return_slot}_hash"
 
-        # Check if sub-results are ready
-        local have_dot=0
-        local have_hash=0
-        local need_dot=0
-        local need_hash=0
+        # Determine which transitions are valid
+        have_dot=0
+        have_hash=0
+        need_dot=0
+        need_hash=0
 
-        # Determine what we need
-        if [[ "$char" == "." || "$char" == "?" ]]; then
+        # Check if treating current character as '.' is valid
+        if [[ "$character" == "." || "$character" == "?" ]]; then
             if (( current_run == 0 )); then
+                # No active run, can place '.' freely
                 need_dot=1
             elif (( group_idx < num_groups && groups[group_idx] == current_run )); then
+                # End of run matches current group size
                 need_dot=1
             fi
         fi
 
-        if [[ "$char" == "#" || "$char" == "?" ]]; then
+        # Check if treating current character as '#' is valid
+        if [[ "$character" == "#" || "$character" == "?" ]]; then
             if (( group_idx < num_groups && current_run < groups[group_idx] )); then
+                # Can extend run if within current group's limit
                 need_hash=1
             fi
         fi
 
-        # Check if we have needed results
+        # Check if we already have the needed sub-results
         if (( need_dot )); then
-            if [[ -v results["$dot_key"] ]]; then
+            if [[ -v results["$dot_result_key"] ]]; then
                 have_dot=1
             fi
         else
+            # Transition not needed, treat as zero contribution
             have_dot=1
-            results["$dot_key"]=0
+            results["$dot_result_key"]=0
         fi
 
         if (( need_hash )); then
-            if [[ -v results["$hash_key"] ]]; then
+            if [[ -v results["$hash_result_key"] ]]; then
                 have_hash=1
             fi
         else
+            # Transition not needed, treat as zero contribution
             have_hash=1
-            results["$hash_key"]=0
+            results["$hash_result_key"]=0
         fi
 
-        # If we have all results, aggregate
+        # Aggregate results if all sub-computations are complete
         if (( have_dot && have_hash )); then
-            local result=$((results["$dot_key"] + results["$hash_key"]))
-            memo["$key"]="$result"
-            results["$return_slot"]="$result"
-            # Clean up intermediate results
-            unset results["$dot_key"]
-            unset results["$hash_key"]
+            final_result=$((results["$dot_result_key"] + results["$hash_result_key"]))
+            memo["$state_key"]="$final_result"
+            results["$return_slot"]="$final_result"
+            # Clean up intermediate results to save memory
+            unset results["$dot_result_key"]
+            unset results["$hash_result_key"]
         else
-            # Re-push current entry to aggregate later
+            # Not ready yet: re-push self to aggregate later, then push sub-calls
             stack[stack_idx]="$entry"
             ((stack_idx++))
 
-            # Push needed sub-calls
+            # Push '.' transition sub-call if needed
             if (( need_dot && !have_dot )); then
                 if (( current_run == 0 )); then
-                    local sub_key="$((pos + 1)),${group_idx},0"
-                    if [[ -v memo["$sub_key"] ]]; then
-                        results["$dot_key"]="${memo[$sub_key]}"
+                    # Continue without consuming a group
+                    sub_state_key="$((position + 1)),${group_idx},0"
+                    if [[ -v memo["$sub_state_key"] ]]; then
+                        results["$dot_result_key"]="${memo[$sub_state_key]}"
                     else
-                        stack[stack_idx]="$((pos + 1)),${group_idx},0,${dot_key}"
+                        stack[stack_idx]="$((position + 1)),${group_idx},0,${dot_result_key}"
                         ((stack_idx++))
                     fi
                 else
-                    local sub_key="$((pos + 1)),$((group_idx + 1)),0"
-                    if [[ -v memo["$sub_key"] ]]; then
-                        results["$dot_key"]="${memo[$sub_key]}"
+                    # End current run, advance to next group
+                    sub_state_key="$((position + 1)),$((group_idx + 1)),0"
+                    if [[ -v memo["$sub_state_key"] ]]; then
+                        results["$dot_result_key"]="${memo[$sub_state_key]}"
                     else
-                        stack[stack_idx]="$((pos + 1)),$((group_idx + 1)),0,${dot_key}"
+                        stack[stack_idx]="$((position + 1)),$((group_idx + 1)),0,${dot_result_key}"
                         ((stack_idx++))
                     fi
                 fi
             fi
 
+            # Push '#' transition sub-call if needed
             if (( need_hash && !have_hash )); then
-                local sub_key="$((pos + 1)),${group_idx},$((current_run + 1))"
-                if [[ -v memo["$sub_key"] ]]; then
-                    results["$hash_key"]="${memo[$sub_key]}"
+                # Extend current run by one
+                sub_state_key="$((position + 1)),${group_idx},$((current_run + 1))"
+                if [[ -v memo["$sub_state_key"] ]]; then
+                    results["$hash_result_key"]="${memo[$sub_state_key]}"
                 else
-                    stack[stack_idx]="$((pos + 1)),${group_idx},$((current_run + 1)),${hash_key}"
+                    stack[stack_idx]="$((position + 1)),${group_idx},$((current_run + 1)),${hash_result_key}"
                     ((stack_idx++))
                 fi
             fi
@@ -155,31 +202,37 @@ count_arrangements_iterative() {
     echo "${results[main]}"
 }
 
-# Process a line and return arrangement count
+# Process a single input line and return the arrangement count
+# Arguments:
+#   $1 - Input line (e.g., "???.### 1,1,3")
+#   $2 - Unfold flag (0 = Part 1, 1 = Part 2)
 process_line() {
     local line="$1"
     local unfold="$2"
 
-    # Parse line
-    local pat="${line%% *}"
-    local groups_str="${line##* }"
+    # Parse line into pattern and groups
+    local pattern_str="${line%% *}"
+    local groups_csv="${line##* }"
 
-    # Unfold for Part 2
+    # Declare loop variables at function scope
+    local unfolded_pattern unfolded_groups
+
+    # Part 2: Unfold pattern 5x with '?' separators, groups 5x with ',' separators
     if (( unfold == 1 )); then
-        local unfolded_pattern="$pat"
-        local unfolded_groups="$groups_str"
-        for i in {1..4}; do
-            unfolded_pattern="${unfolded_pattern}?${pat}"
-            unfolded_groups="${unfolded_groups},${groups_str}"
+        unfolded_pattern="$pattern_str"
+        unfolded_groups="$groups_csv"
+        for _ in {1..4}; do
+            unfolded_pattern="${unfolded_pattern}?${pattern_str}"
+            unfolded_groups="${unfolded_groups},${groups_csv}"
         done
-        pat="$unfolded_pattern"
-        groups_str="$unfolded_groups"
+        pattern_str="$unfolded_pattern"
+        groups_csv="$unfolded_groups"
     fi
 
-    count_arrangements_iterative "$pat" "$groups_str"
+    count_arrangements_iterative "$pattern_str" "$groups_csv"
 }
 
-# Main
+# Main entry point
 main() {
     local input_file="../input.txt"
 
@@ -188,23 +241,23 @@ main() {
         exit 1
     fi
 
+    # Declare variables at function scope
     local part1_total=0
     local part2_total=0
+    local line count
 
-    # Part 1
+    # Part 1: Count arrangements for each row
     while IFS= read -r line || [[ -n "$line" ]]; do
         [[ -z "$line" ]] && continue
-        local count
         count=$(process_line "$line" 0)
         part1_total=$((part1_total + count))
     done < "$input_file"
 
     echo "Part 1: $part1_total"
 
-    # Part 2
+    # Part 2: Unfold patterns 5x and count arrangements
     while IFS= read -r line || [[ -n "$line" ]]; do
         [[ -z "$line" ]] && continue
-        local count
         count=$(process_line "$line" 1)
         part2_total=$((part2_total + count))
     done < "$input_file"
