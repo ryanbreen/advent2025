@@ -7,7 +7,7 @@ Solutions to [Advent of Code](https://adventofcode.com/) challenges across multi
 | Year | Days | Status |
 |------|------|--------|
 | [2025](2025/) | 12/12 | Complete (12 Days of Christmas) |
-| [2024](2024/) | 14/25 | In progress |
+| [2024](2024/) | 25/25 | Complete |
 | [2023](2023/) | 16/25 | In progress |
 
 ## Approach
