@@ -463,6 +463,7 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 
 | Language    | Runtime (ms) | Memory (MB) |
 |-------------|--------------|-------------|
+| C           | 13.4         | 13.1        |
 | ARM64       | 24.7         | 21.5        |
 | C++         | 27.1         | 11.1        |
 | Zig         | 33.6         | 8.1         |
@@ -475,7 +476,6 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Common Lisp | 337.2        | 93.2        |
 | Clojure     | 849.3        | 713.0       |
 | Ruby        | 926.2        | 53.3        |
-| C           | 1,060.0      | 33.9        |
 | Bash        | 1,867.9      | 36.6        |
 | ColdFusion  | 4,029.7      | 1,076.6     |
 | Perl        | 37,189.2     | 117.8       |

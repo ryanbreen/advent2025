@@ -14,7 +14,7 @@
 
 #define MAX_ROWS 150
 #define MAX_COLS 150
-#define HASH_SIZE 2000003  /* Prime number for hash table */
+#define HASH_SIZE 500009  /* Prime number for hash table */
 
 /* Grid storage */
 static char grid[MAX_ROWS][MAX_COLS];
@@ -29,36 +29,51 @@ static const int DC[] = {0, 0, -1, 1};
 typedef struct {
     int r, c;
     int dist;
-    bool occupied;
+    uint32_t gen;  /* Generation counter to avoid clearing */
 } HashEntry;
 
 static HashEntry visited[HASH_SIZE];
+static uint32_t current_gen = 1;
+
+/* Track all visited positions for efficient counting */
+typedef struct {
+    int r, c, dist;
+} VisitedPos;
+static VisitedPos visited_list[500000];
+static int visited_count = 0;
 
 /* BFS queue */
 typedef struct {
     int r, c, dist;
 } QueueItem;
 
-static QueueItem queue[5000000];  /* Large queue for Part 2 BFS */
+static QueueItem queue[500000];
 static int queue_head, queue_tail;
 
 /* Hash function for (r, c) position */
 static inline uint32_t hash_pos(int r, int c) {
-    /* Shift to handle negative coordinates */
+    /* FNV-1a inspired hash for better distribution */
     uint32_t ur = (uint32_t)(r + 500000);
     uint32_t uc = (uint32_t)(c + 500000);
-    return ((ur * 1000003u) ^ uc) % HASH_SIZE;
+    uint64_t h = (uint64_t)ur * 2654435761ULL + uc;
+    return (uint32_t)(h % HASH_SIZE);
 }
 
-/* Clear hash table */
+/* Clear hash table by incrementing generation */
 static void hash_clear(void) {
-    memset(visited, 0, sizeof(visited));
+    current_gen++;
+    visited_count = 0;
+    if (current_gen == 0) {
+        /* Handle overflow by resetting everything */
+        memset(visited, 0, sizeof(visited));
+        current_gen = 1;
+    }
 }
 
 /* Insert into hash table, returns true if newly inserted */
 static bool hash_insert(int r, int c, int dist) {
     uint32_t h = hash_pos(r, c);
-    while (visited[h].occupied) {
+    while (visited[h].gen == current_gen) {
         if (visited[h].r == r && visited[h].c == c) {
             return false;  /* Already exists */
         }
@@ -67,7 +82,9 @@ static bool hash_insert(int r, int c, int dist) {
     visited[h].r = r;
     visited[h].c = c;
     visited[h].dist = dist;
-    visited[h].occupied = true;
+    visited[h].gen = current_gen;
+    /* Track in list for efficient counting */
+    visited_list[visited_count++] = (VisitedPos){r, c, dist};
     return true;
 }
 
@@ -75,12 +92,10 @@ static bool hash_insert(int r, int c, int dist) {
 static int64_t count_matching(int max_steps) {
     int target_parity = max_steps % 2;
     int64_t count = 0;
-    for (int i = 0; i < HASH_SIZE; i++) {
-        if (visited[i].occupied) {
-            int d = visited[i].dist;
-            if (d <= max_steps && d % 2 == target_parity) {
-                count++;
-            }
+    for (int i = 0; i < visited_count; i++) {
+        int d = visited_list[i].dist;
+        if (d <= max_steps && d % 2 == target_parity) {
+            count++;
         }
     }
     return count;

@@ -76,8 +76,6 @@ For steps of the form `65 + n × 131`, the count follows `f(n) = an² + bn + c`
   - C/C++/Rust/Zig/Go: 64-bit `long long` or `i64` suffices
   - ARM64: 64-bit registers handle the calculation
 
-- **C** (1060ms): Unexpectedly slow due to the simple hash table implementation. A more sophisticated hash table would improve performance significantly.
-
 - **Perl** (37s): Hash table operations are very slow for large BFS traversals.
 
 - **Bash** (1868ms): Relies on associative arrays which have significant overhead.
@@ -94,6 +92,7 @@ The double modulo handles negative coordinates correctly.
 
 | Language | Runtime (ms) | Memory (MB) |
 |----------|--------------|-------------|
+| C | 13.42 | 13.05 |
 | ARM64 | 24.71 | 21.48 |
 | C++ | 27.08 | 11.06 |
 | Zig | 33.59 | 8.11 |
@@ -106,7 +105,6 @@ The double modulo handles negative coordinates correctly.
 | Common Lisp | 337.22 | 93.16 |
 | Clojure | 849.27 | 712.95 |
 | Ruby | 926.18 | 53.25 |
-| C | 1060.01 | 33.91 |
 | Bash | 1867.94 | 36.61 |
 | ColdFusion | 4029.66 | 1076.64 |
 | Perl | 37189.22 | 117.78 |
