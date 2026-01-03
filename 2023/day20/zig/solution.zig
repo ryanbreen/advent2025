@@ -1,106 +1,115 @@
 const std = @import("std");
-const Allocator = std.mem.Allocator;
+
+const MAX_MODULES = 64;
+const MAX_DESTINATIONS = 16;
+const MAX_INPUTS = 16;
+const QUEUE_SIZE = 4096;
 
 const ModuleType = enum {
     broadcaster,
     flip_flop,
     conjunction,
-    output, // sink module that doesn't exist in input
+    output,
 };
 
 const Module = struct {
-    name: []const u8,
-    module_type: ModuleType,
-    destinations: []usize, // indices into modules array
-    // For flip-flops: state (on/off)
-    state: bool = false,
-    // For conjunctions: memory of last pulse from each input
-    memory: std.AutoHashMapUnmanaged(usize, bool) = .{}, // input index -> last pulse (true=high)
-    inputs: []usize, // indices of input modules
+    name: []const u8 = "",
+    module_type: ModuleType = .output,
+    destinations: [MAX_DESTINATIONS]u8 = undefined,
+    num_destinations: u8 = 0,
+    // Flip-flop state
+    ff_state: bool = false,
+    // Conjunction memory: input indices and their last pulse values
+    input_indices: [MAX_INPUTS]u8 = undefined,
+    input_memory: [MAX_INPUTS]bool = [_]bool{false} ** MAX_INPUTS,
+    num_inputs: u8 = 0,
 };
 
 const Pulse = struct {
-    source: usize,
-    dest: usize,
+    source: u8,
+    dest: u8,
     high: bool,
 };
 
-fn gcd(a: u64, b: u64) u64 {
-    var x = a;
-    var y = b;
-    while (y != 0) {
-        const t = y;
-        y = x % y;
-        x = t;
-    }
-    return x;
-}
-
-fn lcm(a: u64, b: u64) u64 {
-    return (a / gcd(a, b)) * b;
-}
-
 const Simulator = struct {
-    allocator: Allocator,
-    modules: std.ArrayListUnmanaged(Module),
-    name_to_index: std.StringHashMapUnmanaged(usize),
-    broadcaster_index: usize = 0,
-    rx_input_index: ?usize = null,
+    modules: [MAX_MODULES]Module = [_]Module{.{}} ** MAX_MODULES,
+    num_modules: u8 = 0,
+    broadcaster_idx: u8 = 0,
+    rx_input_idx: u8 = 0,
+    has_rx: bool = false,
 
-    fn init() Simulator {
-        return Simulator{
-            .modules = .{},
-            .name_to_index = .{},
-            .allocator = undefined,
-        };
-    }
+    // Queue for simulation
+    queue: [QUEUE_SIZE]Pulse = undefined,
+    queue_head: usize = 0,
+    queue_tail: usize = 0,
 
-    fn deinit(self: *Simulator) void {
-        for (self.modules.items) |*module| {
-            self.allocator.free(module.destinations);
-            module.memory.deinit(self.allocator);
-            self.allocator.free(module.inputs);
+    // For part 2: watch nodes
+    watch_nodes: [MAX_INPUTS]u8 = undefined,
+    num_watch_nodes: u8 = 0,
+    high_sent: [MAX_INPUTS]bool = [_]bool{false} ** MAX_INPUTS,
+
+    fn findModule(self: *Simulator, name: []const u8) ?u8 {
+        for (0..self.num_modules) |i| {
+            if (std.mem.eql(u8, self.modules[i].name, name)) {
+                return @intCast(i);
+            }
         }
-        self.modules.deinit(self.allocator);
-        self.name_to_index.deinit(self.allocator);
+        return null;
     }
 
-    fn getOrCreateModule(self: *Simulator, name: []const u8) !usize {
-        if (self.name_to_index.get(name)) |index| {
-            return index;
+    fn getOrCreateModule(self: *Simulator, name: []const u8) u8 {
+        if (self.findModule(name)) |idx| {
+            return idx;
         }
-
-        const index = self.modules.items.len;
-        try self.name_to_index.put(self.allocator, name, index);
-
-        try self.modules.append(self.allocator, Module{
-            .name = name,
-            .module_type = .output, // default, will be set properly when parsed
-            .destinations = &[_]usize{},
-            .inputs = &[_]usize{},
-        });
-
-        return index;
+        const idx = self.num_modules;
+        self.modules[idx].name = name;
+        self.modules[idx].module_type = .output;
+        self.modules[idx].num_destinations = 0;
+        self.modules[idx].num_inputs = 0;
+        self.num_modules += 1;
+        return idx;
     }
 
-    fn parse(self: *Simulator, allocator: Allocator, input: []const u8) !void {
-        self.allocator = allocator;
+    fn addConjunctionInput(self: *Simulator, module_idx: u8, input_idx: u8) void {
+        const m = &self.modules[module_idx];
+        // Check if already added
+        for (0..m.num_inputs) |i| {
+            if (m.input_indices[i] == input_idx) return;
+        }
+        m.input_indices[m.num_inputs] = input_idx;
+        m.input_memory[m.num_inputs] = false;
+        m.num_inputs += 1;
+    }
 
-        // Temporary storage for destinations and inputs during parsing
-        var temp_destinations = std.ArrayListUnmanaged(std.ArrayListUnmanaged(usize)){};
-        defer temp_destinations.deinit(allocator);
+    fn findInputIdx(self: *Simulator, module_idx: u8, input_idx: u8) ?u8 {
+        const m = &self.modules[module_idx];
+        for (0..m.num_inputs) |i| {
+            if (m.input_indices[i] == input_idx) {
+                return @intCast(i);
+            }
+        }
+        return null;
+    }
 
-        var temp_inputs = std.ArrayListUnmanaged(std.ArrayListUnmanaged(usize)){};
-        defer temp_inputs.deinit(allocator);
-
+    fn parse(self: *Simulator, input: []const u8) void {
         var lines = std.mem.splitScalar(u8, input, '\n');
 
-        // First pass: create all modules
+        // First pass: create all modules and set up destinations
         while (lines.next()) |line| {
             if (line.len == 0) continue;
 
-            var parts = std.mem.splitSequence(u8, line, " -> ");
-            const name_part = parts.next().?;
+            // Find " -> "
+            var arrow_pos: usize = 0;
+            for (0..line.len - 3) |i| {
+                if (std.mem.eql(u8, line[i .. i + 4], " -> ")) {
+                    arrow_pos = i;
+                    break;
+                }
+            }
+            if (arrow_pos == 0) continue;
+
+            const name_part = line[0..arrow_pos];
+            const dest_part = line[arrow_pos + 4 ..];
 
             var name: []const u8 = undefined;
             var module_type: ModuleType = undefined;
@@ -118,277 +127,224 @@ const Simulator = struct {
                 continue;
             }
 
-            const index = try self.getOrCreateModule(name);
-            self.modules.items[index].module_type = module_type;
+            const idx = self.getOrCreateModule(name);
+            self.modules[idx].module_type = module_type;
 
             if (module_type == .broadcaster) {
-                self.broadcaster_index = index;
-            }
-        }
-
-        // Ensure temp arrays are sized
-        while (temp_destinations.items.len < self.modules.items.len) {
-            try temp_destinations.append(allocator, .{});
-        }
-        while (temp_inputs.items.len < self.modules.items.len) {
-            try temp_inputs.append(allocator, .{});
-        }
-
-        // Second pass: set up destinations and inputs
-        lines = std.mem.splitScalar(u8, input, '\n');
-        while (lines.next()) |line| {
-            if (line.len == 0) continue;
-
-            var parts = std.mem.splitSequence(u8, line, " -> ");
-            const name_part = parts.next().?;
-            const dest_part = parts.next().?;
-
-            var name: []const u8 = undefined;
-            if (std.mem.eql(u8, name_part, "broadcaster")) {
-                name = "broadcaster";
-            } else if (name_part[0] == '%' or name_part[0] == '&') {
-                name = name_part[1..];
-            } else {
-                continue;
+                self.broadcaster_idx = idx;
             }
 
-            const src_index = self.name_to_index.get(name).?;
-
+            // Parse destinations
             var dests = std.mem.splitSequence(u8, dest_part, ", ");
             while (dests.next()) |dest_name| {
-                const dest_index = try self.getOrCreateModule(dest_name);
+                const dest_idx = self.getOrCreateModule(dest_name);
+                self.modules[idx].destinations[self.modules[idx].num_destinations] = dest_idx;
+                self.modules[idx].num_destinations += 1;
 
-                // Grow temp arrays if needed
-                while (temp_destinations.items.len <= dest_index) {
-                    try temp_destinations.append(allocator, .{});
-                }
-                while (temp_inputs.items.len <= dest_index) {
-                    try temp_inputs.append(allocator, .{});
-                }
-
-                try temp_destinations.items[src_index].append(allocator, dest_index);
-                try temp_inputs.items[dest_index].append(allocator, src_index);
-
-                // Check if this destination is rx
+                // Check if this is rx
                 if (std.mem.eql(u8, dest_name, "rx")) {
-                    self.rx_input_index = src_index;
+                    self.rx_input_idx = idx;
+                    self.has_rx = true;
                 }
             }
         }
 
-        // Convert temp arrays to slices and initialize conjunction memory
-        for (self.modules.items, 0..) |*module, i| {
-            if (i < temp_destinations.items.len) {
-                module.destinations = try temp_destinations.items[i].toOwnedSlice(allocator);
-            }
-            if (i < temp_inputs.items.len) {
-                module.inputs = try temp_inputs.items[i].toOwnedSlice(allocator);
-            }
-
-            if (module.module_type == .conjunction) {
-                for (module.inputs) |input_index| {
-                    try module.memory.put(allocator, input_index, false);
+        // Second pass: set up conjunction inputs
+        for (0..self.num_modules) |i| {
+            const m = &self.modules[i];
+            for (0..m.num_destinations) |j| {
+                const dest_idx = m.destinations[j];
+                if (self.modules[dest_idx].module_type == .conjunction) {
+                    self.addConjunctionInput(dest_idx, @intCast(i));
                 }
             }
-        }
-
-        // Clean up any remaining temp arrays
-        for (temp_destinations.items) |*arr| {
-            arr.deinit(allocator);
-        }
-        for (temp_inputs.items) |*arr| {
-            arr.deinit(allocator);
         }
     }
 
     fn reset(self: *Simulator) void {
-        for (self.modules.items) |*module| {
-            module.state = false;
-            if (module.module_type == .conjunction) {
-                var it = module.memory.iterator();
-                while (it.next()) |entry| {
-                    entry.value_ptr.* = false;
-                }
+        for (0..self.num_modules) |i| {
+            self.modules[i].ff_state = false;
+            for (0..self.modules[i].num_inputs) |j| {
+                self.modules[i].input_memory[j] = false;
             }
         }
     }
 
-    fn simulateButtonPress(
-        self: *Simulator,
-        watch_nodes: ?std.AutoHashMapUnmanaged(usize, bool),
-    ) !struct { low: u64, high: u64, high_senders: std.AutoHashMapUnmanaged(usize, bool) } {
-        var low_count: u64 = 0;
-        var high_count: u64 = 0;
-        var high_senders: std.AutoHashMapUnmanaged(usize, bool) = .{};
+    fn enqueue(self: *Simulator, source: u8, dest: u8, high: bool) void {
+        self.queue[self.queue_tail] = Pulse{
+            .source = source,
+            .dest = dest,
+            .high = high,
+        };
+        self.queue_tail = (self.queue_tail + 1) % QUEUE_SIZE;
+    }
 
-        var queue = std.ArrayListUnmanaged(Pulse){};
-        defer queue.deinit(self.allocator);
+    fn dequeue(self: *Simulator) ?Pulse {
+        if (self.queue_head == self.queue_tail) return null;
+        const p = self.queue[self.queue_head];
+        self.queue_head = (self.queue_head + 1) % QUEUE_SIZE;
+        return p;
+    }
 
-        // Button sends low pulse to broadcaster
-        // Use a special index for button (max usize)
-        const button_index: usize = std.math.maxInt(usize);
-        try queue.append(self.allocator, Pulse{
-            .source = button_index,
-            .dest = self.broadcaster_index,
-            .high = false,
-        });
+    fn simulateButtonPress(self: *Simulator, low_count: *u64, high_count: *u64) void {
+        self.queue_head = 0;
+        self.queue_tail = 0;
 
-        var head: usize = 0;
-        while (head < queue.items.len) {
-            const pulse = queue.items[head];
-            head += 1;
+        // Reset high_sent tracking
+        for (0..self.num_watch_nodes) |i| {
+            self.high_sent[i] = false;
+        }
 
-            if (pulse.high) {
-                high_count += 1;
+        // Button sends low to broadcaster (use 255 as "button" source)
+        self.enqueue(255, self.broadcaster_idx, false);
+
+        while (self.dequeue()) |p| {
+            if (p.high) {
+                high_count.* += 1;
             } else {
-                low_count += 1;
+                low_count.* += 1;
             }
 
-            // Track if watched nodes send high pulses
-            if (watch_nodes) |wn| {
-                if (wn.contains(pulse.source) and pulse.high) {
-                    try high_senders.put(self.allocator, pulse.source, true);
+            // Track watched nodes sending high
+            if (p.high) {
+                for (0..self.num_watch_nodes) |i| {
+                    if (p.source == self.watch_nodes[i]) {
+                        self.high_sent[i] = true;
+                    }
                 }
             }
 
-            if (pulse.dest >= self.modules.items.len) continue;
+            const m = &self.modules[p.dest];
 
-            var module = &self.modules.items[pulse.dest];
-
-            switch (module.module_type) {
+            switch (m.module_type) {
                 .broadcaster => {
-                    for (module.destinations) |dest| {
-                        try queue.append(self.allocator, Pulse{
-                            .source = pulse.dest,
-                            .dest = dest,
-                            .high = pulse.high,
-                        });
+                    for (0..m.num_destinations) |i| {
+                        self.enqueue(p.dest, m.destinations[i], p.high);
                     }
                 },
                 .flip_flop => {
-                    if (!pulse.high) {
-                        module.state = !module.state;
-                        for (module.destinations) |dest| {
-                            try queue.append(self.allocator, Pulse{
-                                .source = pulse.dest,
-                                .dest = dest,
-                                .high = module.state,
-                            });
+                    if (!p.high) {
+                        m.ff_state = !m.ff_state;
+                        for (0..m.num_destinations) |i| {
+                            self.enqueue(p.dest, m.destinations[i], m.ff_state);
                         }
                     }
                 },
                 .conjunction => {
-                    module.memory.put(self.allocator, pulse.source, pulse.high) catch {};
+                    // Update memory for the source
+                    if (p.source != 255) {
+                        if (self.findInputIdx(p.dest, p.source)) |input_idx| {
+                            m.input_memory[input_idx] = p.high;
+                        }
+                    }
 
-                    // Send low if all inputs are high, otherwise send high
+                    // Check if all inputs are high
                     var all_high = true;
-                    var it = module.memory.iterator();
-                    while (it.next()) |entry| {
-                        if (!entry.value_ptr.*) {
+                    for (0..m.num_inputs) |i| {
+                        if (!m.input_memory[i]) {
                             all_high = false;
                             break;
                         }
                     }
 
                     const output = !all_high;
-                    for (module.destinations) |dest| {
-                        try queue.append(self.allocator, Pulse{
-                            .source = pulse.dest,
-                            .dest = dest,
-                            .high = output,
-                        });
+                    for (0..m.num_destinations) |i| {
+                        self.enqueue(p.dest, m.destinations[i], output);
                     }
                 },
                 .output => {
-                    // Sink module, does nothing
+                    // Do nothing
                 },
             }
         }
-
-        return .{ .low = low_count, .high = high_count, .high_senders = high_senders };
     }
 
-    fn part1(self: *Simulator) !u64 {
+    fn part1(self: *Simulator) u64 {
         self.reset();
 
         var total_low: u64 = 0;
         var total_high: u64 = 0;
 
         for (0..1000) |_| {
-            const result = try self.simulateButtonPress(null);
-            total_low += result.low;
-            total_high += result.high;
+            self.simulateButtonPress(&total_low, &total_high);
         }
 
         return total_low * total_high;
     }
 
-    fn part2(self: *Simulator) !u64 {
+    fn gcd(a: u64, b: u64) u64 {
+        var x = a;
+        var y = b;
+        while (y != 0) {
+            const t = y;
+            y = x % y;
+            x = t;
+        }
+        return x;
+    }
+
+    fn lcm(a: u64, b: u64) u64 {
+        return (a / gcd(a, b)) * b;
+    }
+
+    fn part2(self: *Simulator) u64 {
         self.reset();
 
-        // rx_input_index is the conjunction that feeds rx
-        const rx_input = self.rx_input_index orelse return 0;
+        if (!self.has_rx) return 0;
 
-        // Get all modules that feed into rx_input
-        var watch_nodes: std.AutoHashMapUnmanaged(usize, bool) = .{};
-        defer watch_nodes.deinit(self.allocator);
-
-        for (self.modules.items[rx_input].inputs) |input_index| {
-            try watch_nodes.put(self.allocator, input_index, true);
+        // Set up watch nodes (inputs to rx_input)
+        const rx_input = &self.modules[self.rx_input_idx];
+        self.num_watch_nodes = rx_input.num_inputs;
+        for (0..rx_input.num_inputs) |i| {
+            self.watch_nodes[i] = rx_input.input_indices[i];
         }
 
-        var cycle_lengths: std.AutoHashMapUnmanaged(usize, u64) = .{};
-        defer cycle_lengths.deinit(self.allocator);
+        // Track cycle lengths
+        var cycle_lengths: [MAX_INPUTS]u64 = [_]u64{0} ** MAX_INPUTS;
+        var found: u8 = 0;
 
         var button_press: u64 = 0;
-        while (cycle_lengths.count() < watch_nodes.count()) {
+        while (found < self.num_watch_nodes) {
             button_press += 1;
-            var result = try self.simulateButtonPress(watch_nodes);
-            defer result.high_senders.deinit(self.allocator);
+            var low: u64 = 0;
+            var high: u64 = 0;
+            self.simulateButtonPress(&low, &high);
 
-            var it = result.high_senders.iterator();
-            while (it.next()) |entry| {
-                if (!cycle_lengths.contains(entry.key_ptr.*)) {
-                    try cycle_lengths.put(self.allocator, entry.key_ptr.*, button_press);
+            for (0..self.num_watch_nodes) |i| {
+                if (self.high_sent[i] and cycle_lengths[i] == 0) {
+                    cycle_lengths[i] = button_press;
+                    found += 1;
                 }
             }
         }
 
-        // Compute LCM of all cycle lengths
-        var final_result: u64 = 1;
-        var it = cycle_lengths.iterator();
-        while (it.next()) |entry| {
-            final_result = lcm(final_result, entry.value_ptr.*);
+        // Calculate LCM of all cycle lengths
+        var result: u64 = 1;
+        for (0..self.num_watch_nodes) |i| {
+            result = lcm(result, cycle_lengths[i]);
         }
 
-        return final_result;
+        return result;
     }
 };
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
-
     // Read input file
     const file = try std.fs.cwd().openFile("../input.txt", .{});
     defer file.close();
-    const input = try file.readToEndAlloc(allocator, 1024 * 1024);
-    defer allocator.free(input);
 
-    var sim = Simulator.init();
-    defer sim.deinit();
+    var buf: [32768]u8 = undefined;
+    const bytes_read = try file.readAll(&buf);
+    const input = buf[0..bytes_read];
 
-    try sim.parse(allocator, input);
+    var sim = Simulator{};
+    sim.parse(input);
 
-    const p1 = try sim.part1();
+    const p1 = sim.part1();
     std.debug.print("Part 1: {}\n", .{p1});
 
-    // Re-parse for part 2 (fresh state)
-    var sim2 = Simulator.init();
-    defer sim2.deinit();
-    try sim2.parse(allocator, input);
-
-    const p2 = try sim2.part2();
+    // Reset for part 2
+    sim.reset();
+    const p2 = sim.part2();
     std.debug.print("Part 2: {}\n", .{p2});
 }

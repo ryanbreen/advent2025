@@ -1,21 +1,29 @@
 /**
  * Day 17: Clumsy Crucible
  * Dijkstra's shortest path with movement constraints.
+ *
+ * Optimized: uses static array for visited states instead of hash set.
  */
 
 #include <iostream>
 #include <fstream>
-#include <sstream>
 #include <vector>
 #include <queue>
-#include <unordered_set>
+#include <cstring>
 #include <string>
 
 using namespace std;
 
+constexpr int MAX_SIZE = 150;
+constexpr int MAX_CONSEC = 11;  // 0-10
+constexpr int NUM_DIRS = 4;
+
 // Direction deltas: 0=right, 1=down, 2=left, 3=up
-const int DR[] = {0, 1, 0, -1};
-const int DC[] = {1, 0, -1, 0};
+constexpr int DR[] = {0, 1, 0, -1};
+constexpr int DC[] = {1, 0, -1, 0};
+
+// Static visited array: [row][col][dir][consec]
+static bool visited[MAX_SIZE][MAX_SIZE][NUM_DIRS][MAX_CONSEC];
 
 struct State {
     int heat;
@@ -26,17 +34,6 @@ struct State {
 
     bool operator>(const State& other) const {
         return heat > other.heat;
-    }
-};
-
-// Hash function for visited states
-struct StateHash {
-    size_t operator()(const tuple<int, int, int, int>& s) const {
-        auto [r, c, d, consec] = s;
-        return hash<long long>()(
-            ((long long)r << 24) | ((long long)c << 16) |
-            ((long long)d << 8) | consec
-        );
     }
 };
 
@@ -61,9 +58,11 @@ int dijkstra(const vector<vector<int>>& grid, int minStraight, int maxStraight) 
     int rows = grid.size();
     int cols = grid[0].size();
 
+    // Clear visited array
+    memset(visited, 0, sizeof(visited));
+
     // Priority queue: min-heap by heat loss
     priority_queue<State, vector<State>, greater<State>> pq;
-    unordered_set<tuple<int, int, int, int>, StateHash> visited;
 
     // Start with no direction (-1)
     pq.push({0, 0, 0, -1, 0});
@@ -79,11 +78,13 @@ int dijkstra(const vector<vector<int>>& grid, int minStraight, int maxStraight) 
             }
         }
 
-        auto state = make_tuple(curr.row, curr.col, curr.dir, curr.consec);
-        if (visited.count(state)) {
+        // Check if already visited (skip dir=-1 case)
+        if (curr.dir >= 0 && visited[curr.row][curr.col][curr.dir][curr.consec]) {
             continue;
         }
-        visited.insert(state);
+        if (curr.dir >= 0) {
+            visited[curr.row][curr.col][curr.dir][curr.consec] = true;
+        }
 
         // Try all four directions
         for (int nd = 0; nd < 4; nd++) {
@@ -115,12 +116,13 @@ int dijkstra(const vector<vector<int>>& grid, int minStraight, int maxStraight) 
                 newConsec = 1;
             }
 
-            int newHeat = curr.heat + grid[nr][nc];
-            auto newState = make_tuple(nr, nc, nd, newConsec);
-
-            if (!visited.count(newState)) {
-                pq.push({newHeat, nr, nc, nd, newConsec});
+            // Skip if already visited
+            if (visited[nr][nc][nd][newConsec]) {
+                continue;
             }
+
+            int newHeat = curr.heat + grid[nr][nc];
+            pq.push({newHeat, nr, nc, nd, newConsec});
         }
     }
 

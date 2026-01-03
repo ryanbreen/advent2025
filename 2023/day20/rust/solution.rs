@@ -1,162 +1,206 @@
 // Day 20: Pulse Propagation - Module communication simulation
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::fs;
 
-#[derive(Clone)]
+const MAX_MODULES: usize = 64;
+
+#[derive(Clone, Copy, PartialEq)]
 enum ModuleType {
     Broadcaster,
-    FlipFlop { state: bool },
-    Conjunction { memory: HashMap<String, bool> },
+    FlipFlop,
+    Conjunction,
+    Output,
 }
 
-#[derive(Clone)]
 struct Module {
     module_type: ModuleType,
-    destinations: Vec<String>,
+    destinations: Vec<usize>,
+    state: bool,                     // For flip-flops
+    input_mask: u64,                 // Bitmask of which modules feed into this conjunction
+    memory: u64,                     // Bitmask of current high inputs for conjunctions
 }
 
-fn parse_input(filename: &str) -> HashMap<String, Module> {
-    let content = fs::read_to_string(filename).expect("Failed to read input file");
-    let mut modules: HashMap<String, Module> = HashMap::new();
-
-    for line in content.trim().lines() {
-        let parts: Vec<&str> = line.split(" -> ").collect();
-        let name_part = parts[0];
-        let destinations: Vec<String> = parts[1].split(", ").map(|s| s.to_string()).collect();
-
-        if name_part == "broadcaster" {
-            modules.insert(
-                "broadcaster".to_string(),
-                Module {
-                    module_type: ModuleType::Broadcaster,
-                    destinations,
-                },
-            );
-        } else if name_part.starts_with('%') {
-            let name = &name_part[1..];
-            modules.insert(
-                name.to_string(),
-                Module {
-                    module_type: ModuleType::FlipFlop { state: false },
-                    destinations,
-                },
-            );
-        } else if name_part.starts_with('&') {
-            let name = &name_part[1..];
-            modules.insert(
-                name.to_string(),
-                Module {
-                    module_type: ModuleType::Conjunction {
-                        memory: HashMap::new(),
-                    },
-                    destinations,
-                },
-            );
+impl Module {
+    fn new(module_type: ModuleType) -> Self {
+        Module {
+            module_type,
+            destinations: Vec::new(),
+            state: false,
+            input_mask: 0,
+            memory: 0,
         }
     }
+}
 
-    // Initialize conjunction memory for all inputs
-    let module_names: Vec<String> = modules.keys().cloned().collect();
-    for name in &module_names {
-        let dests: Vec<String> = modules.get(name).unwrap().destinations.clone();
-        for dest in dests {
-            if let Some(module) = modules.get_mut(&dest) {
-                if let ModuleType::Conjunction { ref mut memory } = module.module_type {
-                    memory.insert(name.clone(), false);
+struct Circuit {
+    modules: Vec<Module>,
+    broadcaster_idx: usize,
+    name_to_idx: std::collections::HashMap<String, usize>,
+}
+
+impl Circuit {
+    fn parse(filename: &str) -> Self {
+        let content = fs::read_to_string(filename).expect("Failed to read input file");
+        let mut name_to_idx: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+        let mut modules: Vec<Module> = Vec::with_capacity(MAX_MODULES);
+        let mut broadcaster_idx = 0;
+
+        // First pass: assign indices to all module names
+        let mut next_idx = 0usize;
+        for line in content.trim().lines() {
+            let parts: Vec<&str> = line.split(" -> ").collect();
+            let name_part = parts[0];
+            let dest_part = parts[1];
+
+            let name = if name_part == "broadcaster" {
+                "broadcaster"
+            } else {
+                &name_part[1..]
+            };
+
+            if !name_to_idx.contains_key(name) {
+                name_to_idx.insert(name.to_string(), next_idx);
+                next_idx += 1;
+            }
+
+            // Also assign indices to destinations
+            for dest in dest_part.split(", ") {
+                if !name_to_idx.contains_key(dest) {
+                    name_to_idx.insert(dest.to_string(), next_idx);
+                    next_idx += 1;
                 }
             }
         }
-    }
 
-    modules
-}
-
-fn simulate_button_press(
-    modules: &mut HashMap<String, Module>,
-    watch_nodes: &Option<Vec<String>>,
-) -> (u64, u64, Vec<String>) {
-    let mut low_count: u64 = 0;
-    let mut high_count: u64 = 0;
-    let mut high_senders: Vec<String> = Vec::new();
-
-    // Queue: (source, destination, pulse) where pulse is true for high, false for low
-    let mut queue: VecDeque<(String, String, bool)> = VecDeque::new();
-    queue.push_back(("button".to_string(), "broadcaster".to_string(), false));
-
-    while let Some((source, dest, pulse)) = queue.pop_front() {
-        if pulse {
-            high_count += 1;
-        } else {
-            low_count += 1;
+        // Initialize all modules
+        for _ in 0..next_idx {
+            modules.push(Module::new(ModuleType::Output));
         }
 
-        // Track if watched nodes send high pulses
-        if let Some(ref nodes) = watch_nodes {
-            if pulse && nodes.contains(&source) {
-                high_senders.push(source.clone());
+        // Second pass: set up module types and destinations
+        for line in content.trim().lines() {
+            let parts: Vec<&str> = line.split(" -> ").collect();
+            let name_part = parts[0];
+            let dest_part = parts[1];
+
+            let (name, module_type) = if name_part == "broadcaster" {
+                ("broadcaster", ModuleType::Broadcaster)
+            } else if name_part.starts_with('%') {
+                (&name_part[1..], ModuleType::FlipFlop)
+            } else {
+                (&name_part[1..], ModuleType::Conjunction)
+            };
+
+            let idx = name_to_idx[name];
+            if name == "broadcaster" {
+                broadcaster_idx = idx;
+            }
+
+            modules[idx].module_type = module_type;
+
+            for dest in dest_part.split(", ") {
+                let dest_idx = name_to_idx[dest];
+                modules[idx].destinations.push(dest_idx);
             }
         }
 
-        if let Some(module) = modules.get_mut(&dest) {
-            match &mut module.module_type {
+        // Third pass: set up conjunction input masks
+        for src_idx in 0..modules.len() {
+            let dests: Vec<usize> = modules[src_idx].destinations.clone();
+            for &dest_idx in &dests {
+                if modules[dest_idx].module_type == ModuleType::Conjunction {
+                    modules[dest_idx].input_mask |= 1u64 << src_idx;
+                }
+            }
+        }
+
+        Circuit {
+            modules,
+            broadcaster_idx,
+            name_to_idx,
+        }
+    }
+
+    fn reset_state(&mut self) {
+        for module in &mut self.modules {
+            module.state = false;
+            module.memory = 0;
+        }
+    }
+
+    fn simulate_button_press(&mut self, watch_mask: u64) -> (u64, u64, u64) {
+        let mut low_count: u64 = 0;
+        let mut high_count: u64 = 0;
+        let mut high_senders: u64 = 0;
+
+        // Queue: (source_idx, dest_idx, is_high_pulse)
+        let mut queue: VecDeque<(usize, usize, bool)> = VecDeque::with_capacity(256);
+        queue.push_back((usize::MAX, self.broadcaster_idx, false)); // usize::MAX = button
+
+        while let Some((source, dest, pulse)) = queue.pop_front() {
+            if pulse {
+                high_count += 1;
+            } else {
+                low_count += 1;
+            }
+
+            // Track if watched nodes send high pulses
+            if watch_mask != 0 && pulse && source < 64 {
+                let source_bit = 1u64 << source;
+                if watch_mask & source_bit != 0 {
+                    high_senders |= source_bit;
+                }
+            }
+
+            let module = &mut self.modules[dest];
+            match module.module_type {
                 ModuleType::Broadcaster => {
-                    let dests = module.destinations.clone();
-                    for next_dest in dests {
-                        queue.push_back((dest.clone(), next_dest, pulse));
+                    for &next_dest in &module.destinations.clone() {
+                        queue.push_back((dest, next_dest, pulse));
                     }
                 }
-                ModuleType::FlipFlop { ref mut state } => {
+                ModuleType::FlipFlop => {
                     if !pulse {
-                        // Only react to low pulses
-                        *state = !*state;
-                        let new_pulse = *state;
-                        let dests = module.destinations.clone();
-                        for next_dest in dests {
-                            queue.push_back((dest.clone(), next_dest, new_pulse));
+                        module.state = !module.state;
+                        let new_pulse = module.state;
+                        for &next_dest in &module.destinations.clone() {
+                            queue.push_back((dest, next_dest, new_pulse));
                         }
                     }
                 }
-                ModuleType::Conjunction { ref mut memory } => {
-                    memory.insert(source.clone(), pulse);
+                ModuleType::Conjunction => {
+                    let source_bit = 1u64 << source;
+                    if pulse {
+                        module.memory |= source_bit;
+                    } else {
+                        module.memory &= !source_bit;
+                    }
                     // Send low if all inputs are high, otherwise send high
-                    let output = !memory.values().all(|&v| v);
-                    let dests = module.destinations.clone();
-                    for next_dest in dests {
-                        queue.push_back((dest.clone(), next_dest, output));
+                    let all_high = module.memory == module.input_mask;
+                    let output = !all_high;
+                    for &next_dest in &module.destinations.clone() {
+                        queue.push_back((dest, next_dest, output));
                     }
                 }
-            }
-        }
-    }
-
-    (low_count, high_count, high_senders)
-}
-
-fn reset_state(modules: &mut HashMap<String, Module>) {
-    for module in modules.values_mut() {
-        match &mut module.module_type {
-            ModuleType::FlipFlop { ref mut state } => {
-                *state = false;
-            }
-            ModuleType::Conjunction { ref mut memory } => {
-                for val in memory.values_mut() {
-                    *val = false;
+                ModuleType::Output => {
+                    // Does nothing
                 }
             }
-            _ => {}
         }
+
+        (low_count, high_count, high_senders)
     }
 }
 
-fn part1(modules: &mut HashMap<String, Module>) -> u64 {
-    reset_state(modules);
+fn part1(circuit: &mut Circuit) -> u64 {
+    circuit.reset_state();
 
     let mut total_low: u64 = 0;
     let mut total_high: u64 = 0;
 
     for _ in 0..1000 {
-        let (low, high, _) = simulate_button_press(modules, &None);
+        let (low, high, _) = circuit.simulate_button_press(0);
         total_low += low;
         total_high += high;
     }
@@ -165,63 +209,65 @@ fn part1(modules: &mut HashMap<String, Module>) -> u64 {
 }
 
 fn gcd(a: u64, b: u64) -> u64 {
-    if b == 0 {
-        a
-    } else {
-        gcd(b, a % b)
-    }
+    if b == 0 { a } else { gcd(b, a % b) }
 }
 
 fn lcm(a: u64, b: u64) -> u64 {
     a / gcd(a, b) * b
 }
 
-fn part2(modules: &mut HashMap<String, Module>) -> u64 {
-    reset_state(modules);
+fn part2(circuit: &mut Circuit) -> u64 {
+    circuit.reset_state();
 
     // Find the module that feeds into rx
-    let mut rx_input: Option<String> = None;
-    for (name, module) in modules.iter() {
-        if module.destinations.contains(&"rx".to_string()) {
-            rx_input = Some(name.clone());
+    let rx_idx = match circuit.name_to_idx.get("rx") {
+        Some(&idx) => idx,
+        None => return 0,
+    };
+
+    let mut rx_input_idx: Option<usize> = None;
+    for (idx, module) in circuit.modules.iter().enumerate() {
+        if module.destinations.contains(&rx_idx) {
+            rx_input_idx = Some(idx);
             break;
         }
     }
 
-    let rx_input = match rx_input {
-        Some(name) => name,
+    let rx_input_idx = match rx_input_idx {
+        Some(idx) => idx,
         None => return 0,
     };
 
-    // Find all modules that feed into rx_input
-    let watch_nodes: Vec<String> = if let Some(module) = modules.get(&rx_input) {
-        if let ModuleType::Conjunction { ref memory } = module.module_type {
-            memory.keys().cloned().collect()
-        } else {
-            return 0;
-        }
-    } else {
+    // Get the input mask for the conjunction feeding rx
+    let watch_mask = circuit.modules[rx_input_idx].input_mask;
+    if watch_mask == 0 {
         return 0;
-    };
+    }
 
-    let watch_option = Some(watch_nodes.clone());
-    let mut cycle_lengths: HashMap<String, u64> = HashMap::new();
+    let watch_count = watch_mask.count_ones() as usize;
+    let mut cycle_lengths: Vec<u64> = Vec::new();
+    let mut found_mask: u64 = 0;
 
     let mut button_press: u64 = 0;
-    while cycle_lengths.len() < watch_nodes.len() {
+    while cycle_lengths.len() < watch_count {
         button_press += 1;
-        let (_, _, high_senders) = simulate_button_press(modules, &watch_option);
+        let (_, _, high_senders) = circuit.simulate_button_press(watch_mask);
 
-        for node in high_senders {
-            if !cycle_lengths.contains_key(&node) {
-                cycle_lengths.insert(node, button_press);
+        // Check for newly found high senders
+        let new_found = high_senders & !found_mask;
+        if new_found != 0 {
+            // For each bit set in new_found, record the cycle length
+            let new_count = new_found.count_ones() as usize;
+            for _ in 0..new_count {
+                cycle_lengths.push(button_press);
             }
+            found_mask |= new_found;
         }
     }
 
     // LCM of all cycle lengths
     let mut result: u64 = 1;
-    for &length in cycle_lengths.values() {
+    for &length in &cycle_lengths {
         result = lcm(result, length);
     }
 
@@ -229,10 +275,7 @@ fn part2(modules: &mut HashMap<String, Module>) -> u64 {
 }
 
 fn main() {
-    let mut modules = parse_input("../input.txt");
-    println!("Part 1: {}", part1(&mut modules));
-
-    // Re-parse for part 2 (fresh state)
-    let mut modules = parse_input("../input.txt");
-    println!("Part 2: {}", part2(&mut modules));
+    let mut circuit = Circuit::parse("../input.txt");
+    println!("Part 1: {}", part1(&mut circuit));
+    println!("Part 2: {}", part2(&mut circuit));
 }

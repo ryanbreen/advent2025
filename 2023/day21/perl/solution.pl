@@ -1,9 +1,9 @@
 #!/usr/bin/env perl
 # Day 21: Step Counter - Garden plot reachability
+# Optimized: removed bigint, use array-based queue with index, packed keys
 
 use strict;
 use warnings;
-use bigint;
 
 # Parse the input grid and find starting position
 sub parse_input {
@@ -26,6 +26,14 @@ sub parse_input {
     return (\@grid, $start_r, $start_c);
 }
 
+# Pack coordinates into a single integer key
+# Grid is 131x131, so we need to handle coordinates from about -400 to +400
+# Use offset of 500 to make all values positive, then pack as (r+500)*1000 + (c+500)
+sub pack_key {
+    my ($r, $c) = @_;
+    return ($r + 500) * 1000 + ($c + 500);
+}
+
 # Part 1: Count cells reachable in exactly 'steps' steps (bounded grid)
 sub count_reachable {
     my ($grid, $start_r, $start_c, $steps) = @_;
@@ -34,24 +42,23 @@ sub count_reachable {
 
     # BFS to find minimum steps to each cell
     my %visited;
-    my @queue = ([$start_r, $start_c, 0]);
-    $visited{"$start_r,$start_c"} = 0;
+    my @queue;
+    push @queue, [$start_r, $start_c, 0];
+    my $qi = 0;
+    $visited{pack_key($start_r, $start_c)} = 0;
 
-    my @dirs = ([-1, 0], [1, 0], [0, -1], [0, 1]);
-
-    while (@queue) {
-        my $curr = shift @queue;
-        my ($r, $c, $dist) = @$curr;
+    while ($qi < @queue) {
+        my ($r, $c, $dist) = @{$queue[$qi++]};
 
         next if $dist >= $steps;
 
-        for my $dir (@dirs) {
+        for my $dir ([-1, 0], [1, 0], [0, -1], [0, 1]) {
             my ($dr, $dc) = @$dir;
             my $nr = $r + $dr;
             my $nc = $c + $dc;
 
             if ($nr >= 0 && $nr < $rows && $nc >= 0 && $nc < $cols) {
-                my $key = "$nr,$nc";
+                my $key = pack_key($nr, $nc);
                 my $ch = substr($grid->[$nr], $nc, 1);
                 if ($ch ne '#' && !exists $visited{$key}) {
                     $visited{$key} = $dist + 1;
@@ -80,23 +87,22 @@ sub count_reachable_infinite_bfs {
     my $cols = length $grid->[0];
 
     my %visited;
-    my @queue = ([$start_r, $start_c, 0]);
-    $visited{"$start_r,$start_c"} = 0;
+    my @queue;
+    push @queue, [$start_r, $start_c, 0];
+    my $qi = 0;
+    $visited{pack_key($start_r, $start_c)} = 0;
 
-    my @dirs = ([-1, 0], [1, 0], [0, -1], [0, 1]);
-
-    while (@queue) {
-        my $curr = shift @queue;
-        my ($r, $c, $dist) = @$curr;
+    while ($qi < @queue) {
+        my ($r, $c, $dist) = @{$queue[$qi++]};
 
         next if $dist >= $steps;
 
-        for my $dir (@dirs) {
+        for my $dir ([-1, 0], [1, 0], [0, -1], [0, 1]) {
             my ($dr, $dc) = @$dir;
             my $nr = $r + $dr;
             my $nc = $c + $dc;
 
-            my $key = "$nr,$nc";
+            my $key = pack_key($nr, $nc);
             # Map to grid coordinates (infinite tiling)
             my $gr = $nr % $rows;
             $gr += $rows if $gr < 0;
@@ -148,7 +154,7 @@ sub count_reachable_infinite {
     # a = (y2 - 2*y1 + y0) / 2
     # b = y1 - y0 - a
     # c = y0
-    my $a = ($y2 - 2 * $y1 + $y0) / 2;
+    my $a = int(($y2 - 2 * $y1 + $y0) / 2);
     my $b = $y1 - $y0 - $a;
     my $c = $y0;
 

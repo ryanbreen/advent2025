@@ -70,7 +70,7 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Java        | 63.6         | 50.5        |
 | PHP         | 68.5         | 24.6        |
 | Ruby        | 85.5         | 28.3        |
-| Go          | 136.6        | 26.4        |
+| Go          | 7.5          | 3.9         |
 | Clojure     | 477.8        | 127.3       |
 | ColdFusion  | 3,542.7      | 1,138.6     |
 | Bash        | 15,625.7     | 2.3         |
@@ -122,6 +122,7 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Language    | Runtime (ms) | Memory (MB) |
 |-------------|--------------|-------------|
 | ARM64 asm   | 5.5          | 1.9         |
+| Go          | 6.4          | 4.1         |
 | Rust        | 6.5          | 1.9         |
 | C++         | 6.6          | 1.9         |
 | C           | 6.8          | 1.9         |
@@ -132,7 +133,6 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Python      | 38.9         | 18.0        |
 | Node.js     | 57.8         | 46.3        |
 | PHP         | 65.4         | 26.1        |
-| Go          | 70.4         | 27.3        |
 | Ruby        | 77.0         | 28.2        |
 | Java        | 79.1         | 55.9        |
 | Bash        | 347.8        | 7.2         |
@@ -456,8 +456,8 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | PHP         | 111.7        | 25.8        |
 | Ruby        | 146.6        | 27.9        |
 | Perl        | 189.4        | 5.0         |
-| ColdFusion  | 295.9        | 4.9         |
 | Clojure     | 535.6        | 316.3       |
+| ColdFusion  | 3,284.6      | 1,099.8     |
 | Bash        | 11,619.5     | 7.0         |
 
 ### Day 21: Step Counter

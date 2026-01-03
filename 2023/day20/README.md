@@ -79,8 +79,8 @@ This is much faster than simulating ~243 trillion button presses.
 | PHP         | 111.7        | 25.8        |
 | Ruby        | 146.6        | 27.9        |
 | Perl        | 189.4        | 5.0         |
-| ColdFusion  | 295.9        | 4.9         |
 | Clojure     | 535.6        | 316.3       |
+| ColdFusion  | 3,284.6      | 1,099.8     |
 | Bash        | 11,619.5     | 7.0         |
 
 ## Answers

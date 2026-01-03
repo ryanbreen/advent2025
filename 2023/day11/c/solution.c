@@ -22,6 +22,10 @@ static int num_galaxies = 0;
 static bool empty_rows[MAX_LINES];
 static bool empty_cols[MAX_LINE_LEN];
 
+/* Prefix sums: prefix_empty_rows[i] = count of empty rows in [0, i) */
+static int prefix_empty_rows[MAX_LINES + 1];
+static int prefix_empty_cols[MAX_LINE_LEN + 1];
+
 static void parse_input(const char *filename) {
     FILE *f = fopen(filename, "r");
     if (!f) {
@@ -72,6 +76,17 @@ static void find_empty_rows_and_cols(void) {
         empty_rows[galaxies[i].row] = false;
         empty_cols[galaxies[i].col] = false;
     }
+
+    /* Build prefix sums for O(1) range queries */
+    prefix_empty_rows[0] = 0;
+    for (int r = 0; r < num_rows; r++) {
+        prefix_empty_rows[r + 1] = prefix_empty_rows[r] + (empty_rows[r] ? 1 : 0);
+    }
+
+    prefix_empty_cols[0] = 0;
+    for (int c = 0; c < num_cols; c++) {
+        prefix_empty_cols[c + 1] = prefix_empty_cols[c] + (empty_cols[c] ? 1 : 0);
+    }
 }
 
 static long long calculate_distances(long long expansion_factor) {
@@ -84,25 +99,17 @@ static long long calculate_distances(long long expansion_factor) {
             int r2 = galaxies[j].row;
             int c2 = galaxies[j].col;
 
-            /* Calculate row distance with expansion */
+            /* Calculate row distance with expansion using prefix sums */
             int min_r = (r1 < r2) ? r1 : r2;
             int max_r = (r1 > r2) ? r1 : r2;
-            long long row_dist = max_r - min_r;
-            for (int r = min_r; r < max_r; r++) {
-                if (empty_rows[r]) {
-                    row_dist += expansion_factor - 1;
-                }
-            }
+            int empty_row_count = prefix_empty_rows[max_r] - prefix_empty_rows[min_r];
+            long long row_dist = (max_r - min_r) + (long long)empty_row_count * (expansion_factor - 1);
 
-            /* Calculate column distance with expansion */
+            /* Calculate column distance with expansion using prefix sums */
             int min_c = (c1 < c2) ? c1 : c2;
             int max_c = (c1 > c2) ? c1 : c2;
-            long long col_dist = max_c - min_c;
-            for (int c = min_c; c < max_c; c++) {
-                if (empty_cols[c]) {
-                    col_dist += expansion_factor - 1;
-                }
-            }
+            int empty_col_count = prefix_empty_cols[max_c] - prefix_empty_cols[min_c];
+            long long col_dist = (max_c - min_c) + (long long)empty_col_count * (expansion_factor - 1);
 
             total += row_dist + col_dist;
         }

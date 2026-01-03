@@ -429,20 +429,24 @@ unfold_groups_done:
 
 // ============================================================================
 // clear_memo: Clear memoization table to NOT_COMPUTED (-2)
+// Optimized: 4x unrolled loop with paired stores (stp)
+// Each stp writes 16 bytes (2 qwords), 4 stp = 8 qwords per iteration
+// 195000 / 8 = 24375 iterations
 // ============================================================================
 clear_memo:
     stp     x29, x30, [sp, #-16]!
     stp     x19, x20, [sp, #-16]!
 
     load_addr x19, memo
-    // MEMO_SIZE = 195000 = 0x2F9B8
-    movz    x20, #0xF9B8
-    movk    x20, #0x0002, lsl #16
     mov     x0, #NOT_COMPUTED
+    movz    x20, #24375
 
 clear_memo_loop:
     cbz     x20, clear_memo_done
-    str     x0, [x19], #8
+    stp     x0, x0, [x19], #16
+    stp     x0, x0, [x19], #16
+    stp     x0, x0, [x19], #16
+    stp     x0, x0, [x19], #16
     sub     x20, x20, #1
     b       clear_memo_loop
 

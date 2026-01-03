@@ -1,22 +1,27 @@
 // Day 17: Clumsy Crucible - Dijkstra's shortest path with movement constraints
+//
+// Optimized: uses fixed-size array for visited states instead of HashSet.
 
-use std::collections::{BinaryHeap, HashSet};
+use std::collections::BinaryHeap;
 use std::cmp::Ordering;
 use std::fs;
 use std::path::Path;
 
-#[derive(Clone, Copy, Eq, PartialEq, Hash)]
-struct State {
-    row: i32,
-    col: i32,
-    direction: i8,    // -1 = no direction, 0=right, 1=down, 2=left, 3=up
-    consecutive: u8,
-}
+const MAX_SIZE: usize = 150;
+const MAX_CONSEC: usize = 11;  // 0-10
+const NUM_DIRS: usize = 4;
+
+// Direction deltas: right, down, left, up
+const DR: [i32; 4] = [0, 1, 0, -1];
+const DC: [i32; 4] = [1, 0, -1, 0];
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 struct Node {
     heat: u32,
-    state: State,
+    row: i32,
+    col: i32,
+    direction: i8,    // -1 = no direction, 0=right, 1=down, 2=left, 3=up
+    consecutive: u8,
 }
 
 // For BinaryHeap - we want min-heap, so reverse the ordering
@@ -45,27 +50,21 @@ fn dijkstra(grid: &[Vec<u8>], min_straight: u8, max_straight: u8) -> u32 {
     let rows = grid.len() as i32;
     let cols = grid[0].len() as i32;
 
-    // Direction deltas: right, down, left, up
-    let dr: [i32; 4] = [0, 1, 0, -1];
-    let dc: [i32; 4] = [1, 0, -1, 0];
+    // Visited array: [row][col][dir][consec]
+    let mut visited = vec![[[false; MAX_CONSEC]; NUM_DIRS]; MAX_SIZE * MAX_SIZE];
 
     let mut pq = BinaryHeap::new();
-    let mut visited: HashSet<(i32, i32, i8, u8)> = HashSet::new();
 
     // Start with no direction
     pq.push(Node {
         heat: 0,
-        state: State {
-            row: 0,
-            col: 0,
-            direction: -1,
-            consecutive: 0,
-        },
+        row: 0,
+        col: 0,
+        direction: -1,
+        consecutive: 0,
     });
 
-    while let Some(Node { heat, state }) = pq.pop() {
-        let State { row, col, direction, consecutive } = state;
-
+    while let Some(Node { heat, row, col, direction, consecutive }) = pq.pop() {
         // Check if we reached the goal
         if row == rows - 1 && col == cols - 1 {
             if min_straight == 0 || consecutive >= min_straight {
@@ -73,11 +72,14 @@ fn dijkstra(grid: &[Vec<u8>], min_straight: u8, max_straight: u8) -> u32 {
             }
         }
 
-        let state_key = (row, col, direction, consecutive);
-        if visited.contains(&state_key) {
-            continue;
+        // Check if already visited (skip dir=-1 case)
+        if direction >= 0 {
+            let idx = (row as usize) * MAX_SIZE + (col as usize);
+            if visited[idx][direction as usize][consecutive as usize] {
+                continue;
+            }
+            visited[idx][direction as usize][consecutive as usize] = true;
         }
-        visited.insert(state_key);
 
         // Try all four directions
         for nd in 0..4i8 {
@@ -86,8 +88,8 @@ fn dijkstra(grid: &[Vec<u8>], min_straight: u8, max_straight: u8) -> u32 {
                 continue;
             }
 
-            let nr = row + dr[nd as usize];
-            let nc = col + dc[nd as usize];
+            let nr = row + DR[nd as usize];
+            let nc = col + DC[nd as usize];
 
             // Bounds check
             if nr < 0 || nr >= rows || nc < 0 || nc >= cols {
@@ -110,20 +112,20 @@ fn dijkstra(grid: &[Vec<u8>], min_straight: u8, max_straight: u8) -> u32 {
                 new_consec = 1;
             }
 
-            let new_heat = heat + grid[nr as usize][nc as usize] as u32;
-            let new_state_key = (nr, nc, nd, new_consec);
-
-            if !visited.contains(&new_state_key) {
-                pq.push(Node {
-                    heat: new_heat,
-                    state: State {
-                        row: nr,
-                        col: nc,
-                        direction: nd,
-                        consecutive: new_consec,
-                    },
-                });
+            // Skip if already visited
+            let nr_idx = (nr as usize) * MAX_SIZE + (nc as usize);
+            if visited[nr_idx][nd as usize][new_consec as usize] {
+                continue;
             }
+
+            let new_heat = heat + grid[nr as usize][nc as usize] as u32;
+            pq.push(Node {
+                heat: new_heat,
+                row: nr,
+                col: nc,
+                direction: nd,
+                consecutive: new_consec,
+            });
         }
     }
 

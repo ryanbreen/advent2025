@@ -112,6 +112,7 @@ After tuning to use associative arrays instead of eval-based dynamic variables, 
 | Language    | Runtime (ms) | Memory (MB) |
 |-------------|--------------|-------------|
 | ARM64 asm   | 5.5          | 1.9         |
+| Go          | 6.4          | 4.1         |
 | Rust        | 6.5          | 1.9         |
 | C++         | 6.6          | 1.9         |
 | C           | 6.8          | 1.9         |
@@ -122,7 +123,6 @@ After tuning to use associative arrays instead of eval-based dynamic variables, 
 | Python      | 38.9         | 18.0        |
 | Node.js     | 57.8         | 46.3        |
 | PHP         | 65.4         | 26.1        |
-| Go          | 70.4         | 27.3        |
 | Ruby        | 77.0         | 28.2        |
 | Java        | 79.1         | 55.9        |
 | Bash        | 347.8        | 7.2         |

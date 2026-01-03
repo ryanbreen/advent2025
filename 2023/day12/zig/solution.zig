@@ -1,73 +1,78 @@
 const std = @import("std");
 
-const State = struct {
-    pos: u16,
-    group_idx: u8,
-    current_run: u8,
-};
+const MAX_PATTERN_LEN = 128;
+const MAX_GROUPS = 64;
+const MAX_RUN_LEN = 32;
 
-fn countArrangements(pattern: []const u8, groups: []const u8, allocator: std.mem.Allocator) !u64 {
-    var memo = std.AutoHashMap(State, u64).init(allocator);
-    defer memo.deinit();
+// Pre-allocated memoization table as a flat array
+// Using a sentinel value (max u64) to indicate "not computed"
+const NOT_COMPUTED: u64 = std.math.maxInt(u64);
 
-    return try dp(pattern, groups, 0, 0, 0, &memo);
+// Thread-local (in practice, global) state for the current line being processed
+var g_pattern: []const u8 = undefined;
+var g_groups: []const u8 = undefined;
+var g_memo: [MAX_PATTERN_LEN * MAX_GROUPS * MAX_RUN_LEN]u64 = undefined;
+
+fn resetMemo() void {
+    @memset(&g_memo, NOT_COMPUTED);
 }
 
-fn dp(
-    pattern: []const u8,
-    groups: []const u8,
-    pos: u16,
-    group_idx: u8,
-    current_run: u8,
-    memo: *std.AutoHashMap(State, u64),
-) !u64 {
-    const state = State{ .pos = pos, .group_idx = group_idx, .current_run = current_run };
+inline fn memoIndex(pos: usize, group_idx: usize, current_run: usize) usize {
+    return pos * (MAX_GROUPS * MAX_RUN_LEN) + group_idx * MAX_RUN_LEN + current_run;
+}
 
-    // Check memo
-    if (memo.get(state)) |cached| {
-        return cached;
-    }
+fn countArrangements(pattern: []const u8, groups: []const u8) u64 {
+    g_pattern = pattern;
+    g_groups = groups;
+    resetMemo();
+    return dp(0, 0, 0);
+}
 
+fn dp(pos: usize, group_idx: usize, current_run: usize) u64 {
     // Base case: reached end of pattern
-    if (pos == pattern.len) {
-        var result: u64 = 0;
+    if (pos == g_pattern.len) {
         // Valid if we've matched all groups and no partial run
-        if (group_idx == groups.len and current_run == 0) {
-            result = 1;
+        if (group_idx == g_groups.len and current_run == 0) {
+            return 1;
         }
         // Or if we're on the last group and the run matches
-        else if (group_idx == groups.len - 1 and groups[group_idx] == current_run) {
-            result = 1;
+        if (group_idx == g_groups.len - 1 and g_groups[group_idx] == current_run) {
+            return 1;
         }
-        try memo.put(state, result);
-        return result;
+        return 0;
+    }
+
+    // Check memo
+    const idx = memoIndex(pos, group_idx, current_run);
+    if (g_memo[idx] != NOT_COMPUTED) {
+        return g_memo[idx];
     }
 
     var result: u64 = 0;
-    const char = pattern[pos];
+    const char = g_pattern[pos];
 
     // Option 1: Place operational spring (.)
     if (char == '.' or char == '?') {
         if (current_run == 0) {
             // No active run, just move forward
-            result += try dp(pattern, groups, pos + 1, group_idx, 0, memo);
-        } else if (group_idx < groups.len and groups[group_idx] == current_run) {
+            result += dp(pos + 1, group_idx, 0);
+        } else if (group_idx < g_groups.len and g_groups[group_idx] == current_run) {
             // End current run if it matches expected group size
-            result += try dp(pattern, groups, pos + 1, group_idx + 1, 0, memo);
+            result += dp(pos + 1, group_idx + 1, 0);
         }
         // Otherwise invalid (run doesn't match group)
     }
 
     // Option 2: Place damaged spring (#)
     if (char == '#' or char == '?') {
-        if (group_idx < groups.len and current_run < groups[group_idx]) {
+        if (group_idx < g_groups.len and current_run < g_groups[group_idx]) {
             // Can extend current run
-            result += try dp(pattern, groups, pos + 1, group_idx, current_run + 1, memo);
+            result += dp(pos + 1, group_idx, current_run + 1);
         }
         // Otherwise invalid (exceeds group size or no more groups)
     }
 
-    try memo.put(state, result);
+    g_memo[idx] = result;
     return result;
 }
 
@@ -169,12 +174,12 @@ pub fn main() !void {
         const parsed = try parseLine(clean_line, &groups_buf);
 
         // Part 1
-        const count1 = try countArrangements(parsed.pattern, parsed.groups, allocator);
+        const count1 = countArrangements(parsed.pattern, parsed.groups);
         part1_total += count1;
 
         // Part 2: unfold and count
         const unfolded = unfold(parsed.pattern, parsed.groups, &unfolded_pattern_buf, &unfolded_groups_buf);
-        const count2 = try countArrangements(unfolded.pattern, unfolded.groups, allocator);
+        const count2 = countArrangements(unfolded.pattern, unfolded.groups);
         part2_total += count2;
     }
 

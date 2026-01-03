@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::fs;
 
 type Galaxy = (usize, usize);
@@ -16,32 +15,37 @@ fn parse_grid(lines: &[&str]) -> Vec<Galaxy> {
         .collect()
 }
 
-fn find_empty_rows_and_cols(lines: &[&str]) -> (HashSet<usize>, HashSet<usize>) {
+fn build_prefix_sums(lines: &[&str], galaxies: &[Galaxy]) -> (Vec<i32>, Vec<i32>) {
     let rows = lines.len();
     let cols = if rows > 0 { lines[0].len() } else { 0 };
 
-    let empty_rows: HashSet<usize> = lines
-        .iter()
-        .enumerate()
-        .filter(|(_, line)| !line.contains('#'))
-        .map(|(r, _)| r)
-        .collect();
+    // Track which rows and columns contain galaxies
+    let mut empty_rows = vec![true; rows];
+    let mut empty_cols = vec![true; cols];
 
-    let empty_cols: HashSet<usize> = (0..cols)
-        .filter(|&c| {
-            (0..rows).all(|r| {
-                lines[r].as_bytes().get(c).map_or(true, |&b| b != b'#')
-            })
-        })
-        .collect();
+    for &(r, c) in galaxies {
+        empty_rows[r] = false;
+        empty_cols[c] = false;
+    }
 
-    (empty_rows, empty_cols)
+    // Build prefix sums for O(1) range queries
+    let mut prefix_rows = vec![0i32; rows + 1];
+    for r in 0..rows {
+        prefix_rows[r + 1] = prefix_rows[r] + if empty_rows[r] { 1 } else { 0 };
+    }
+
+    let mut prefix_cols = vec![0i32; cols + 1];
+    for c in 0..cols {
+        prefix_cols[c + 1] = prefix_cols[c] + if empty_cols[c] { 1 } else { 0 };
+    }
+
+    (prefix_rows, prefix_cols)
 }
 
 fn calculate_distances(
     galaxies: &[Galaxy],
-    empty_rows: &HashSet<usize>,
-    empty_cols: &HashSet<usize>,
+    prefix_rows: &[i32],
+    prefix_cols: &[i32],
     expansion_factor: u64,
 ) -> u64 {
     let mut total: u64 = 0;
@@ -51,13 +55,15 @@ fn calculate_distances(
             let (r1, c1) = galaxies[i];
             let (r2, c2) = galaxies[j];
 
+            // Calculate row distance with expansion using prefix sums
             let (min_r, max_r) = (r1.min(r2), r1.max(r2));
-            let row_crossings = (min_r..max_r).filter(|r| empty_rows.contains(r)).count() as u64;
-            let row_dist = (max_r - min_r) as u64 + row_crossings * (expansion_factor - 1);
+            let empty_row_count = (prefix_rows[max_r] - prefix_rows[min_r]) as u64;
+            let row_dist = (max_r - min_r) as u64 + empty_row_count * (expansion_factor - 1);
 
+            // Calculate column distance with expansion using prefix sums
             let (min_c, max_c) = (c1.min(c2), c1.max(c2));
-            let col_crossings = (min_c..max_c).filter(|c| empty_cols.contains(c)).count() as u64;
-            let col_dist = (max_c - min_c) as u64 + col_crossings * (expansion_factor - 1);
+            let empty_col_count = (prefix_cols[max_c] - prefix_cols[min_c]) as u64;
+            let col_dist = (max_c - min_c) as u64 + empty_col_count * (expansion_factor - 1);
 
             total += row_dist + col_dist;
         }
@@ -68,10 +74,10 @@ fn calculate_distances(
 
 fn solve(lines: &[&str]) -> (u64, u64) {
     let galaxies = parse_grid(lines);
-    let (empty_rows, empty_cols) = find_empty_rows_and_cols(lines);
+    let (prefix_rows, prefix_cols) = build_prefix_sums(lines, &galaxies);
 
-    let part1 = calculate_distances(&galaxies, &empty_rows, &empty_cols, 2);
-    let part2 = calculate_distances(&galaxies, &empty_rows, &empty_cols, 1_000_000);
+    let part1 = calculate_distances(&galaxies, &prefix_rows, &prefix_cols, 2);
+    let part2 = calculate_distances(&galaxies, &prefix_rows, &prefix_cols, 1_000_000);
 
     (part1, part2)
 }

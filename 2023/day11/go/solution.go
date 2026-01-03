@@ -22,48 +22,51 @@ func parseGrid(lines []string) []point {
 	return galaxies
 }
 
-func findEmptyRowsAndCols(lines []string) (map[int]struct{}, map[int]struct{}) {
+func findEmptyRowsAndCols(lines []string, galaxies []point) ([]int, []int) {
 	rows := len(lines)
 	cols := 0
 	if rows > 0 {
 		cols = len(lines[0])
 	}
 
-	emptyRows := make(map[int]struct{})
-	emptyCols := make(map[int]struct{})
+	// Use boolean arrays to track empty rows/cols
+	emptyRows := make([]bool, rows)
+	emptyCols := make([]bool, cols)
+	for i := range emptyRows {
+		emptyRows[i] = true
+	}
+	for i := range emptyCols {
+		emptyCols[i] = true
+	}
 
-	// Find empty rows
-	for r, line := range lines {
-		hasGalaxy := false
-		for _, ch := range line {
-			if ch == '#' {
-				hasGalaxy = true
-				break
-			}
-		}
-		if !hasGalaxy {
-			emptyRows[r] = struct{}{}
+	// Mark rows and columns containing galaxies as not empty
+	for _, g := range galaxies {
+		emptyRows[g.row] = false
+		emptyCols[g.col] = false
+	}
+
+	// Build prefix sums for O(1) range queries
+	prefixRows := make([]int, rows+1)
+	prefixCols := make([]int, cols+1)
+
+	for r := 0; r < rows; r++ {
+		prefixRows[r+1] = prefixRows[r]
+		if emptyRows[r] {
+			prefixRows[r+1]++
 		}
 	}
 
-	// Find empty columns
 	for c := 0; c < cols; c++ {
-		hasGalaxy := false
-		for r := 0; r < rows; r++ {
-			if lines[r][c] == '#' {
-				hasGalaxy = true
-				break
-			}
-		}
-		if !hasGalaxy {
-			emptyCols[c] = struct{}{}
+		prefixCols[c+1] = prefixCols[c]
+		if emptyCols[c] {
+			prefixCols[c+1]++
 		}
 	}
 
-	return emptyRows, emptyCols
+	return prefixRows, prefixCols
 }
 
-func calculateDistances(galaxies []point, emptyRows, emptyCols map[int]struct{}, expansionFactor int) int64 {
+func calculateDistances(galaxies []point, prefixRows, prefixCols []int, expansionFactor int64) int64 {
 	var total int64
 
 	for i := 0; i < len(galaxies); i++ {
@@ -71,23 +74,15 @@ func calculateDistances(galaxies []point, emptyRows, emptyCols map[int]struct{},
 			r1, c1 := galaxies[i].row, galaxies[i].col
 			r2, c2 := galaxies[j].row, galaxies[j].col
 
-			// Calculate row distance with expansion
+			// Calculate row distance with expansion using prefix sums
 			minR, maxR := min(r1, r2), max(r1, r2)
-			rowDist := int64(maxR - minR)
-			for r := minR; r < maxR; r++ {
-				if _, ok := emptyRows[r]; ok {
-					rowDist += int64(expansionFactor - 1)
-				}
-			}
+			emptyRowCount := prefixRows[maxR] - prefixRows[minR]
+			rowDist := int64(maxR-minR) + int64(emptyRowCount)*(expansionFactor-1)
 
-			// Calculate column distance with expansion
+			// Calculate column distance with expansion using prefix sums
 			minC, maxC := min(c1, c2), max(c1, c2)
-			colDist := int64(maxC - minC)
-			for c := minC; c < maxC; c++ {
-				if _, ok := emptyCols[c]; ok {
-					colDist += int64(expansionFactor - 1)
-				}
-			}
+			emptyColCount := prefixCols[maxC] - prefixCols[minC]
+			colDist := int64(maxC-minC) + int64(emptyColCount)*(expansionFactor-1)
 
 			total += rowDist + colDist
 		}
@@ -96,9 +91,9 @@ func calculateDistances(galaxies []point, emptyRows, emptyCols map[int]struct{},
 	return total
 }
 
-func solve(lines []string, galaxies []point, emptyRows, emptyCols map[int]struct{}) (int64, int64) {
-	part1 := calculateDistances(galaxies, emptyRows, emptyCols, 2)
-	part2 := calculateDistances(galaxies, emptyRows, emptyCols, 1000000)
+func solve(galaxies []point, prefixRows, prefixCols []int) (int64, int64) {
+	part1 := calculateDistances(galaxies, prefixRows, prefixCols, 2)
+	part2 := calculateDistances(galaxies, prefixRows, prefixCols, 1000000)
 	return part1, part2
 }
 
@@ -131,9 +126,9 @@ func main() {
 
 	// Parse once, use for both parts
 	galaxies := parseGrid(lines)
-	emptyRows, emptyCols := findEmptyRowsAndCols(lines)
+	prefixRows, prefixCols := findEmptyRowsAndCols(lines, galaxies)
 
-	p1, p2 := solve(lines, galaxies, emptyRows, emptyCols)
+	p1, p2 := solve(galaxies, prefixRows, prefixCols)
 	fmt.Println("Part 1:", p1)
 	fmt.Println("Part 2:", p2)
 }

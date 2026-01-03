@@ -175,7 +175,7 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Java        | 63.6         | 50.5        |
 | PHP         | 68.5         | 24.6        |
 | Ruby        | 85.5         | 28.3        |
-| Go          | 136.6        | 26.4        |
+| Go          | 7.5          | 3.9         |
 | Clojure     | 477.8        | 127.3       |
 | ColdFusion  | 3,542.7      | 1,138.6     |
 | Bash        | 15,625.7     | 2.3         |
@@ -183,7 +183,7 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 ### Notable Observations
 
 1. **ARM64 Assembly** is fastest at 5.9ms despite the parsing complexity
-2. **Go** is surprisingly slow (136.6ms) compared to other compiled languages, likely due to regex or reflection usage
+2. **Go** performs competitively with other compiled languages at 7.5ms
 3. **Bash** is extremely slow because string parsing requires many subprocess spawns
 4. Memory usage follows expected patterns: compiled (~2MB) < interpreted (~15-50MB) < JVM (~50-500MB)
 
