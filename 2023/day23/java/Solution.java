@@ -4,205 +4,214 @@ import java.util.*;
 
 /**
  * Day 23: A Long Walk - Longest path through hiking trails.
+ *
+ * Optimized version using:
+ * - Integer indices for junctions instead of encoded longs
+ * - Bitmask for visited tracking (O(1) operations, no allocation)
+ * - Array-based adjacency list instead of nested HashMaps
  */
 public class Solution {
+
+    private static final int MAX_JUNCTIONS = 64;
+    private static final int MAX_EDGES = 10;
 
     private static final int[] DR = {-1, 1, 0, 0};
     private static final int[] DC = {0, 0, -1, 1};
 
-    private static final Map<Character, int[]> SLOPE_DIRS = Map.of(
-        '^', new int[]{-1, 0},
-        'v', new int[]{1, 0},
-        '<', new int[]{0, -1},
-        '>', new int[]{0, 1}
-    );
+    // Grid data
+    private static char[][] grid;
+    private static int rows, cols;
+
+    // Junction data
+    private static int[][] junctions = new int[MAX_JUNCTIONS][2];  // [row, col]
+    private static int numJunctions;
+    private static int[][] junctionIndex;  // junctionIndex[r][c] = index or -1
+
+    // Adjacency list: adjTo[node][i] = neighbor index, adjWeight[node][i] = edge weight
+    private static int[][] adjTo = new int[MAX_JUNCTIONS][MAX_EDGES];
+    private static int[][] adjWeight = new int[MAX_JUNCTIONS][MAX_EDGES];
+    private static int[] adjCount = new int[MAX_JUNCTIONS];
 
     public static void main(String[] args) throws IOException {
         Path inputPath = Paths.get(args.length > 0 ? args[0] : "../input.txt");
-        List<String> grid = Files.readAllLines(inputPath);
+        List<String> lines = Files.readAllLines(inputPath);
 
-        System.out.println("Part 1: " + solve(grid, true));
-        System.out.println("Part 2: " + solve(grid, false));
-    }
+        rows = lines.size();
+        cols = lines.get(0).length();
+        grid = new char[rows][cols];
+        junctionIndex = new int[rows][cols];
 
-    /**
-     * Solve for either part.
-     */
-    private static int solve(List<String> grid, boolean respectSlopes) {
-        int rows = grid.size();
-        int cols = grid.get(0).length();
-
-        int startCol = grid.get(0).indexOf('.');
-        int endCol = grid.get(rows - 1).indexOf('.');
-
-        int[] start = {0, startCol};
-        int[] end = {rows - 1, endCol};
-
-        Set<Long> junctions = findJunctions(grid, start, end);
-        Map<Long, Map<Long, Integer>> graph = buildGraph(grid, junctions, respectSlopes);
-
-        return longestPathDfs(graph, encode(start[0], start[1]), encode(end[0], end[1]));
-    }
-
-    /**
-     * Encode row, col into a single long for efficient storage.
-     */
-    private static long encode(int r, int c) {
-        return ((long) r << 16) | (c & 0xFFFF);
-    }
-
-    /**
-     * Decode row from encoded value.
-     */
-    private static int decodeRow(long encoded) {
-        return (int) (encoded >> 16);
-    }
-
-    /**
-     * Decode column from encoded value.
-     */
-    private static int decodeCol(long encoded) {
-        return (int) (encoded & 0xFFFF);
-    }
-
-    /**
-     * Find all junction points (start, end, and intersections with 3+ neighbors).
-     */
-    private static Set<Long> findJunctions(List<String> grid, int[] start, int[] end) {
-        int rows = grid.size();
-        int cols = grid.get(0).length();
-        Set<Long> junctions = new HashSet<>();
-
-        // Add start and end
-        junctions.add(encode(start[0], start[1]));
-        junctions.add(encode(end[0], end[1]));
-
-        // Find intersections
         for (int r = 0; r < rows; r++) {
+            grid[r] = lines.get(r).toCharArray();
+            Arrays.fill(junctionIndex[r], -1);
+        }
+
+        System.out.println("Part 1: " + solve(true));
+        System.out.println("Part 2: " + solve(false));
+    }
+
+    private static int solve(boolean respectSlopes) {
+        findJunctions();
+        buildGraph(respectSlopes);
+        return longestPath();
+    }
+
+    private static int getSlopeDir(char c) {
+        switch (c) {
+            case '^': return 0;
+            case 'v': return 1;
+            case '<': return 2;
+            case '>': return 3;
+            default: return -1;
+        }
+    }
+
+    private static void findJunctions() {
+        numJunctions = 0;
+        for (int r = 0; r < rows; r++) {
+            Arrays.fill(junctionIndex[r], -1);
+        }
+
+        // Find start (first . in row 0)
+        for (int c = 0; c < cols; c++) {
+            if (grid[0][c] == '.') {
+                junctions[numJunctions][0] = 0;
+                junctions[numJunctions][1] = c;
+                junctionIndex[0][c] = numJunctions++;
+                break;
+            }
+        }
+
+        // Find end (first . in last row)
+        for (int c = 0; c < cols; c++) {
+            if (grid[rows - 1][c] == '.') {
+                junctions[numJunctions][0] = rows - 1;
+                junctions[numJunctions][1] = c;
+                junctionIndex[rows - 1][c] = numJunctions++;
+                break;
+            }
+        }
+
+        // Find intersections (cells with 3+ walkable neighbors)
+        for (int r = 1; r < rows - 1; r++) {
             for (int c = 0; c < cols; c++) {
-                if (grid.get(r).charAt(c) == '#') continue;
+                if (grid[r][c] == '#') continue;
 
                 int neighbors = 0;
                 for (int d = 0; d < 4; d++) {
                     int nr = r + DR[d];
                     int nc = c + DC[d];
-                    if (nr >= 0 && nr < rows && nc >= 0 && nc < cols
-                            && grid.get(nr).charAt(nc) != '#') {
+                    if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && grid[nr][nc] != '#') {
                         neighbors++;
                     }
                 }
 
                 if (neighbors >= 3) {
-                    junctions.add(encode(r, c));
+                    junctions[numJunctions][0] = r;
+                    junctions[numJunctions][1] = c;
+                    junctionIndex[r][c] = numJunctions++;
                 }
             }
         }
-
-        return junctions;
     }
 
-    /**
-     * Build a compressed graph of junctions with edge weights (distances).
-     */
-    private static Map<Long, Map<Long, Integer>> buildGraph(
-            List<String> grid, Set<Long> junctions, boolean respectSlopes) {
-        int rows = grid.size();
-        int cols = grid.get(0).length();
+    private static void buildGraph(boolean respectSlopes) {
+        Arrays.fill(adjCount, 0);
 
-        Map<Long, Map<Long, Integer>> graph = new HashMap<>();
-        for (long junction : junctions) {
-            graph.put(junction, new HashMap<>());
-        }
+        // Stack for DFS: [r, c, dist]
+        int[] stackR = new int[rows * cols];
+        int[] stackC = new int[rows * cols];
+        int[] stackDist = new int[rows * cols];
+        boolean[][] visited = new boolean[rows][cols];
 
-        for (long startJunction : junctions) {
-            int startR = decodeRow(startJunction);
-            int startC = decodeCol(startJunction);
+        for (int ji = 0; ji < numJunctions; ji++) {
+            int startR = junctions[ji][0];
+            int startC = junctions[ji][1];
 
-            // DFS/BFS from each junction to find reachable junctions
-            Deque<int[]> stack = new ArrayDeque<>();
-            Set<Long> visited = new HashSet<>();
+            // Reset visited
+            for (int r = 0; r < rows; r++) {
+                Arrays.fill(visited[r], false);
+            }
 
-            stack.push(new int[]{startR, startC, 0});
-            visited.add(startJunction);
+            int sp = 0;
+            stackR[sp] = startR;
+            stackC[sp] = startC;
+            stackDist[sp] = 0;
+            sp++;
+            visited[startR][startC] = true;
 
-            while (!stack.isEmpty()) {
-                int[] current = stack.pop();
-                int r = current[0];
-                int c = current[1];
-                int dist = current[2];
+            while (sp > 0) {
+                sp--;
+                int r = stackR[sp];
+                int c = stackC[sp];
+                int dist = stackDist[sp];
 
-                long encoded = encode(r, c);
-                if (dist > 0 && junctions.contains(encoded)) {
-                    // Found another junction
-                    graph.get(startJunction).put(encoded, dist);
+                // If we've reached another junction (not the start), record edge
+                if (dist > 0 && junctionIndex[r][c] >= 0) {
+                    int targetJi = junctionIndex[r][c];
+                    int idx = adjCount[ji];
+                    adjTo[ji][idx] = targetJi;
+                    adjWeight[ji][idx] = dist;
+                    adjCount[ji]++;
                     continue;
                 }
 
                 // Explore neighbors
                 for (int d = 0; d < 4; d++) {
-                    int dr = DR[d];
-                    int dc = DC[d];
-                    int nr = r + dr;
-                    int nc = c + dc;
+                    int nr = r + DR[d];
+                    int nc = c + DC[d];
 
                     if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
-                    if (grid.get(nr).charAt(nc) == '#') continue;
-
-                    long neighborEncoded = encode(nr, nc);
-                    if (visited.contains(neighborEncoded)) continue;
+                    if (grid[nr][nc] == '#') continue;
+                    if (visited[nr][nc]) continue;
 
                     // Check slope constraints for Part 1
                     if (respectSlopes) {
-                        char cell = grid.get(r).charAt(c);
-                        if (SLOPE_DIRS.containsKey(cell)) {
-                            int[] reqDir = SLOPE_DIRS.get(cell);
-                            if (dr != reqDir[0] || dc != reqDir[1]) {
-                                continue;
-                            }
+                        int slopeDir = getSlopeDir(grid[r][c]);
+                        if (slopeDir >= 0 && slopeDir != d) {
+                            continue;
                         }
                     }
 
-                    visited.add(neighborEncoded);
-                    stack.push(new int[]{nr, nc, dist + 1});
+                    visited[nr][nc] = true;
+                    stackR[sp] = nr;
+                    stackC[sp] = nc;
+                    stackDist[sp] = dist + 1;
+                    sp++;
                 }
             }
         }
-
-        return graph;
     }
 
-    /**
-     * Find longest path using DFS with backtracking.
-     */
-    private static int longestPathDfs(Map<Long, Map<Long, Integer>> graph, long start, long end) {
-        Set<Long> visited = new HashSet<>();
-        return dfs(graph, start, end, visited);
+    private static int longestPath() {
+        // Start is junction 0, end is junction 1
+        return dfs(0, 1, 0L);
     }
 
-    private static int dfs(Map<Long, Map<Long, Integer>> graph, long node, long end, Set<Long> visited) {
+    private static int dfs(int node, int end, long visitedMask) {
         if (node == end) {
             return 0;
         }
 
-        visited.add(node);
-        int maxDist = Integer.MIN_VALUE;
+        visitedMask |= (1L << node);
+        int maxDist = -1;
 
-        Map<Long, Integer> neighbors = graph.get(node);
-        if (neighbors != null) {
-            for (Map.Entry<Long, Integer> entry : neighbors.entrySet()) {
-                long neighbor = entry.getKey();
-                int dist = entry.getValue();
+        int count = adjCount[node];
+        for (int i = 0; i < count; i++) {
+            int neighbor = adjTo[node][i];
+            int weight = adjWeight[node][i];
 
-                if (!visited.contains(neighbor)) {
-                    int result = dfs(graph, neighbor, end, visited);
-                    if (result != Integer.MIN_VALUE) {
-                        maxDist = Math.max(maxDist, dist + result);
-                    }
+            if ((visitedMask & (1L << neighbor)) != 0) continue;
+
+            int result = dfs(neighbor, end, visitedMask);
+            if (result >= 0) {
+                int total = weight + result;
+                if (total > maxDist) {
+                    maxDist = total;
                 }
             }
         }
 
-        visited.remove(node);
         return maxDist;
     }
 }

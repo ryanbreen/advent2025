@@ -1,8 +1,6 @@
 #!/usr/bin/env ruby
 # Day 23: A Long Walk - Longest path through hiking trails.
 
-require 'set'
-
 def parse_input(filename)
   File.read(filename).strip.split("\n")
 end
@@ -10,17 +8,17 @@ end
 def find_junctions(grid)
   rows = grid.length
   cols = grid[0].length
-  junctions = Set.new
+  junctions = []
 
   # Start and end points
   start_col = grid[0].index('.')
   end_col = grid[rows - 1].index('.')
-  junctions.add([0, start_col])
-  junctions.add([rows - 1, end_col])
+  junctions << [0, start_col]
+  junctions << [rows - 1, end_col]
 
   # Find intersections (cells with 3+ walkable neighbors)
-  (0...rows).each do |r|
-    (0...cols).each do |c|
+  rows.times do |r|
+    cols.times do |c|
       next if grid[r][c] == '#'
 
       neighbors = 0
@@ -31,16 +29,22 @@ def find_junctions(grid)
         end
       end
 
-      junctions.add([r, c]) if neighbors >= 3
+      junctions << [r, c] if neighbors >= 3
     end
   end
 
-  junctions
+  junctions.uniq
 end
 
 def build_graph(grid, junctions, respect_slopes)
   rows = grid.length
   cols = grid[0].length
+
+  # Create a set of junction coordinates for fast lookup
+  junction_set = {}
+  junctions.each_with_index do |j, idx|
+    junction_set[[j[0], j[1]]] = idx
+  end
 
   # Direction mappings for slopes
   slope_dirs = {
@@ -50,30 +54,36 @@ def build_graph(grid, junctions, respect_slopes)
     '>' => [0, 1]
   }
 
-  graph = Hash.new { |h, k| h[k] = {} }
+  # Graph: array of arrays, graph[i] = [[neighbor_idx, dist], ...]
+  graph = Array.new(junctions.length) { [] }
+  directions = [[-1, 0], [1, 0], [0, -1], [0, 1]]
 
-  junctions.each do |start_junction|
-    # BFS/DFS from each junction to find reachable junctions
-    stack = [[start_junction, 0]]
-    visited = Set.new([start_junction])
+  junctions.each_with_index do |start_junction, start_idx|
+    # BFS from each junction to find reachable junctions
+    stack = [[start_junction[0], start_junction[1], 0]]
+    visited = { (start_junction[0] * cols + start_junction[1]) => true }
 
     while !stack.empty?
-      pos, dist = stack.pop
-      r, c = pos
+      r, c, dist = stack.pop
 
-      if dist > 0 && junctions.include?([r, c])
-        # Found another junction
-        graph[start_junction][[r, c]] = dist
-        next
+      if dist > 0
+        junction_idx = junction_set[[r, c]]
+        if junction_idx
+          # Found another junction
+          graph[start_idx] << [junction_idx, dist]
+          next
+        end
       end
 
       # Explore neighbors
-      [[-1, 0], [1, 0], [0, -1], [0, 1]].each do |dr, dc|
+      directions.each do |dr, dc|
         nr, nc = r + dr, c + dc
 
         next unless nr >= 0 && nr < rows && nc >= 0 && nc < cols
         next if grid[nr][nc] == '#'
-        next if visited.include?([nr, nc])
+
+        key = nr * cols + nc
+        next if visited[key]
 
         # Check slope constraints for Part 1
         if respect_slopes
@@ -84,8 +94,8 @@ def build_graph(grid, junctions, respect_slopes)
           end
         end
 
-        visited.add([nr, nc])
-        stack.push([[nr, nc], dist + 1])
+        visited[key] = true
+        stack << [nr, nc, dist + 1]
       end
     end
   end
@@ -93,17 +103,23 @@ def build_graph(grid, junctions, respect_slopes)
   graph
 end
 
-def longest_path_dfs(graph, start_pos, end_pos)
-  visited = Set.new
+def longest_path_dfs(graph, start_idx, end_idx)
+  n = graph.length
+  visited = Array.new(n, false)
 
-  dfs = lambda do |node|
-    return 0 if node == end_pos
+  # Iterative DFS with explicit stack to avoid Ruby lambda overhead
+  # But for longest path with backtracking, we need recursion
+  # Use a simple recursive approach with minimal overhead
 
-    visited.add(node)
+  dfs = nil
+  dfs = ->(node) {
+    return 0 if node == end_idx
+
+    visited[node] = true
     max_dist = nil
 
     graph[node].each do |neighbor, dist|
-      unless visited.include?(neighbor)
+      unless visited[neighbor]
         result = dfs.call(neighbor)
         if result
           candidate = dist + result
@@ -112,22 +128,28 @@ def longest_path_dfs(graph, start_pos, end_pos)
       end
     end
 
-    visited.delete(node)
+    visited[node] = false
     max_dist
-  end
+  }
 
-  dfs.call(start_pos)
+  dfs.call(start_idx)
 end
 
 def solve(grid, respect_slopes)
   rows = grid.length
+  cols = grid[0].length
   start_pos = [0, grid[0].index('.')]
   end_pos = [rows - 1, grid[rows - 1].index('.')]
 
   junctions = find_junctions(grid)
+
+  # Find indices of start and end in junctions array
+  start_idx = junctions.index(start_pos)
+  end_idx = junctions.index(end_pos)
+
   graph = build_graph(grid, junctions, respect_slopes)
 
-  longest_path_dfs(graph, start_pos, end_pos)
+  longest_path_dfs(graph, start_idx, end_idx)
 end
 
 def part1(grid)

@@ -59,17 +59,17 @@ The visited set uses a **bitmask** (since V < 64) for O(1) add/remove operations
 - **Rust (161ms)**: Nearly identical to C++. HashMap with u64 bitmask.
 - **Zig (168ms)**: Competitive with C++/Rust.
 - **C (169ms)**: Compact adjacency lists with bitmask visited tracking.
+- **Go (186ms)**: Bitmask visited + integer-indexed adjacency list.
 - **ARM64 (216ms)**: Hand-written assembly with bitmask tracking.
-- **Java (1.8s)**: JVM overhead, but respectable for this problem class.
-- **Go (3.2s)**: Map-based visited tracking is slower than bitmask.
-- **Node.js (3.7s)**: Recursive DFS with Set operations.
+- **Java (397ms)**: Primitive arrays + bitmask, well-optimized.
+- **Node.js (405ms)**: TypedArrays for visited/adjacency, integer indices.
 - **Common Lisp (4.0s)**: SBCL performs well with hash-table tracking.
 - **PHP (4.7s)**: Associative array overhead.
+- **Ruby (7.6s)**: Integer indices + boolean array visited.
+- **Python (10.4s)**: Set-based visited with recursive DFS.
 - **Clojure (11.3s)**: Persistent data structures add overhead for backtracking.
-- **Python (12.5s)**: Set-based visited with recursive DFS.
 - **Perl (15.9s)**: Hash-based tracking.
 - **ColdFusion (31.4s)**: JVM + interpreter overhead.
-- **Ruby (87.9s)**: Recursive method calls are expensive.
 - **Bash (>300s)**: Too slow for benchmark - DFS backtracking in shell is impractical.
 
 ## Benchmarks
@@ -80,17 +80,17 @@ The visited set uses a **bitmask** (since V < 64) for O(1) add/remove operations
 | Rust        | 161.4        | 1.9         |
 | Zig         | 168.1        | 1.9         |
 | C           | 169.2        | 1.7         |
+| Go          | 186.4        | 5.7         |
 | ARM64       | 215.9        | 1.4         |
-| Java        | 1,782.5      | 1,284.1     |
-| Go          | 3,219.3      | 6.6         |
-| Node.js     | 3,677.8      | 62.7        |
+| Java        | 396.6        | 50.3        |
+| Node.js     | 405.4        | 50.4        |
 | Common Lisp | 4,001.3      | 53.0        |
 | PHP         | 4,721.3      | 25.7        |
+| Ruby        | 7,576.8      | 27.9        |
+| Python      | 10,414.5     | 15.8        |
 | Clojure     | 11,336.2     | 1,323.7     |
-| Python      | 12,541.0     | 16.0        |
 | Perl        | 15,922.1     | 4.6         |
 | ColdFusion  | 31,407.9     | 1,026.5     |
-| Ruby        | 87,935.8     | 28.1        |
 | Bash        | >300,000     | ~10         |
 
 ## Answers

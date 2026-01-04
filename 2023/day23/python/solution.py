@@ -4,6 +4,9 @@
 from pathlib import Path
 from collections import defaultdict
 
+DIRECTIONS = ((-1, 0), (1, 0), (0, -1), (0, 1))
+SLOPE_DIRS = {'^': (-1, 0), 'v': (1, 0), '<': (0, -1), '>': (0, 1)}
+
 
 def parse_input(filename: str) -> list[str]:
     """Parse the grid from input."""
@@ -13,24 +16,22 @@ def parse_input(filename: str) -> list[str]:
 def find_junctions(grid: list[str]) -> set[tuple[int, int]]:
     """Find all junction points (start, end, and intersections)."""
     rows, cols = len(grid), len(grid[0])
-    junctions = set()
 
     # Start and end points
     start = (0, grid[0].index('.'))
     end = (rows - 1, grid[rows - 1].index('.'))
-    junctions.add(start)
-    junctions.add(end)
+    junctions = {start, end}
 
     # Find intersections (cells with 3+ walkable neighbors)
     for r in range(rows):
         for c in range(cols):
             if grid[r][c] == '#':
                 continue
-            neighbors = 0
-            for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                nr, nc = r + dr, c + dc
-                if 0 <= nr < rows and 0 <= nc < cols and grid[nr][nc] != '#':
-                    neighbors += 1
+            neighbors = sum(
+                1 for dr, dc in DIRECTIONS
+                if 0 <= r + dr < rows and 0 <= c + dc < cols
+                and grid[r + dr][c + dc] != '#'
+            )
             if neighbors >= 3:
                 junctions.add((r, c))
 
@@ -40,19 +41,10 @@ def find_junctions(grid: list[str]) -> set[tuple[int, int]]:
 def build_graph(grid: list[str], junctions: set[tuple[int, int]], respect_slopes: bool) -> dict:
     """Build a graph of junctions with edge weights (distances)."""
     rows, cols = len(grid), len(grid[0])
-
-    # Direction mappings for slopes
-    slope_dirs = {
-        '^': (-1, 0),
-        'v': (1, 0),
-        '<': (0, -1),
-        '>': (0, 1)
-    }
-
     graph = defaultdict(dict)
 
     for start_junction in junctions:
-        # BFS from each junction to find reachable junctions
+        # DFS from each junction to find reachable junctions
         stack = [(start_junction, 0)]
         visited = {start_junction}
 
@@ -60,27 +52,21 @@ def build_graph(grid: list[str], junctions: set[tuple[int, int]], respect_slopes
             (r, c), dist = stack.pop()
 
             if dist > 0 and (r, c) in junctions:
-                # Found another junction
                 graph[start_junction][(r, c)] = dist
                 continue
 
-            # Explore neighbors
-            for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            for dr, dc in DIRECTIONS:
                 nr, nc = r + dr, c + dc
                 if not (0 <= nr < rows and 0 <= nc < cols):
                     continue
-                if grid[nr][nc] == '#':
-                    continue
-                if (nr, nc) in visited:
+                if grid[nr][nc] == '#' or (nr, nc) in visited:
                     continue
 
                 # Check slope constraints for Part 1
                 if respect_slopes:
                     cell = grid[r][c]
-                    if cell in slope_dirs:
-                        req_dr, req_dc = slope_dirs[cell]
-                        if (dr, dc) != (req_dr, req_dc):
-                            continue
+                    if cell in SLOPE_DIRS and (dr, dc) != SLOPE_DIRS[cell]:
+                        continue
 
                 visited.add((nr, nc))
                 stack.append(((nr, nc), dist + 1))
@@ -97,12 +83,12 @@ def longest_path_dfs(graph: dict, start: tuple[int, int], end: tuple[int, int]) 
             return 0
 
         visited.add(node)
-        max_dist = float('-inf')
+        max_dist = -1
 
         for neighbor, dist in graph[node].items():
             if neighbor not in visited:
                 result = dfs(neighbor)
-                if result != float('-inf'):
+                if result >= 0:
                     max_dist = max(max_dist, dist + result)
 
         visited.remove(node)

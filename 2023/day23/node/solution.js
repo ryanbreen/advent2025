@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
  * Day 23: A Long Walk - Longest path through hiking trails.
+ * Optimized with typed arrays for visited set and flattened adjacency list.
  */
 
 import { readFileSync } from 'fs';
@@ -16,129 +17,196 @@ function parseInput(filename) {
 function findJunctions(grid) {
   const rows = grid.length;
   const cols = grid[0].length;
-  const junctions = new Set();
+  const junctions = [];
 
   // Start and end points
   const startCol = grid[0].indexOf('.');
   const endCol = grid[rows - 1].indexOf('.');
-  junctions.add(`0,${startCol}`);
-  junctions.add(`${rows - 1},${endCol}`);
+
+  // Use encoded position: r * cols + c
+  const junctionSet = new Set();
+  junctionSet.add(0 * cols + startCol);
+  junctionSet.add((rows - 1) * cols + endCol);
 
   // Find intersections (cells with 3+ walkable neighbors)
-  const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       if (grid[r][c] === '#') continue;
       let neighbors = 0;
-      for (const [dr, dc] of dirs) {
-        const nr = r + dr, nc = c + dc;
-        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && grid[nr][nc] !== '#') {
-          neighbors++;
-        }
-      }
+      if (r > 0 && grid[r - 1][c] !== '#') neighbors++;
+      if (r < rows - 1 && grid[r + 1][c] !== '#') neighbors++;
+      if (c > 0 && grid[r][c - 1] !== '#') neighbors++;
+      if (c < cols - 1 && grid[r][c + 1] !== '#') neighbors++;
       if (neighbors >= 3) {
-        junctions.add(`${r},${c}`);
+        junctionSet.add(r * cols + c);
       }
     }
   }
 
-  return junctions;
-}
-
-function buildGraph(grid, junctions, respectSlopes) {
-  const rows = grid.length;
-  const cols = grid[0].length;
-
-  const slopeDirs = {
-    '^': [-1, 0],
-    'v': [1, 0],
-    '<': [0, -1],
-    '>': [0, 1]
-  };
-
-  const graph = new Map();
-  for (const junction of junctions) {
-    graph.set(junction, new Map());
+  // Convert to array and create position-to-index map
+  for (const pos of junctionSet) {
+    junctions.push(pos);
   }
 
-  const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  const posToIndex = new Map();
+  for (let i = 0; i < junctions.length; i++) {
+    posToIndex.set(junctions[i], i);
+  }
 
-  for (const startJunction of junctions) {
-    const [startR, startC] = startJunction.split(',').map(Number);
+  return { junctions, junctionSet, posToIndex, cols };
+}
+
+function buildGraph(grid, junctionData, respectSlopes) {
+  const { junctions, junctionSet, posToIndex, cols } = junctionData;
+  const rows = grid.length;
+  const numJunctions = junctions.length;
+
+  // Collect edges first
+  const tempAdj = new Array(numJunctions);
+  for (let i = 0; i < numJunctions; i++) {
+    tempAdj[i] = [];
+  }
+
+  const slopeDirs = { '^': -cols, 'v': cols, '<': -1, '>': 1 };
+
+  for (let startIdx = 0; startIdx < numJunctions; startIdx++) {
+    const startPos = junctions[startIdx];
+    const startR = Math.floor(startPos / cols);
+    const startC = startPos % cols;
+
+    // DFS from junction to find reachable junctions
     const stack = [[startR, startC, 0]];
-    const visited = new Set([startJunction]);
+    const visited = new Set([startPos]);
 
     while (stack.length > 0) {
       const [r, c, dist] = stack.pop();
-      const key = `${r},${c}`;
+      const pos = r * cols + c;
 
-      if (dist > 0 && junctions.has(key)) {
-        graph.get(startJunction).set(key, dist);
+      if (dist > 0 && junctionSet.has(pos)) {
+        const neighborIdx = posToIndex.get(pos);
+        tempAdj[startIdx].push(neighborIdx, dist);
         continue;
       }
 
-      for (const [dr, dc] of dirs) {
-        const nr = r + dr, nc = c + dc;
-        if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
-        if (grid[nr][nc] === '#') continue;
+      const cell = grid[r][c];
 
-        const nkey = `${nr},${nc}`;
-        if (visited.has(nkey)) continue;
-
-        // Check slope constraints for Part 1
-        if (respectSlopes) {
-          const cell = grid[r][c];
-          if (cell in slopeDirs) {
-            const [reqDr, reqDc] = slopeDirs[cell];
-            if (dr !== reqDr || dc !== reqDc) continue;
+      // Check all 4 directions - unrolled for speed
+      const nr1 = r - 1;
+      if (nr1 >= 0 && grid[nr1][c] !== '#') {
+        const npos = pos - cols;
+        if (!visited.has(npos)) {
+          if (!respectSlopes || !(cell in slopeDirs) || slopeDirs[cell] === -cols) {
+            visited.add(npos);
+            stack.push([nr1, c, dist + 1]);
           }
         }
-
-        visited.add(nkey);
-        stack.push([nr, nc, dist + 1]);
       }
-    }
-  }
 
-  return graph;
-}
+      const nr2 = r + 1;
+      if (nr2 < rows && grid[nr2][c] !== '#') {
+        const npos = pos + cols;
+        if (!visited.has(npos)) {
+          if (!respectSlopes || !(cell in slopeDirs) || slopeDirs[cell] === cols) {
+            visited.add(npos);
+            stack.push([nr2, c, dist + 1]);
+          }
+        }
+      }
 
-function longestPathDFS(graph, start, end) {
-  const visited = new Set();
+      const nc3 = c - 1;
+      if (nc3 >= 0 && grid[r][nc3] !== '#') {
+        const npos = pos - 1;
+        if (!visited.has(npos)) {
+          if (!respectSlopes || !(cell in slopeDirs) || slopeDirs[cell] === -1) {
+            visited.add(npos);
+            stack.push([r, nc3, dist + 1]);
+          }
+        }
+      }
 
-  function dfs(node) {
-    if (node === end) return 0;
-
-    visited.add(node);
-    let maxDist = -Infinity;
-
-    for (const [neighbor, dist] of graph.get(node).entries()) {
-      if (!visited.has(neighbor)) {
-        const result = dfs(neighbor);
-        if (result !== -Infinity) {
-          maxDist = Math.max(maxDist, dist + result);
+      const nc4 = c + 1;
+      if (nc4 < cols && grid[r][nc4] !== '#') {
+        const npos = pos + 1;
+        if (!visited.has(npos)) {
+          if (!respectSlopes || !(cell in slopeDirs) || slopeDirs[cell] === 1) {
+            visited.add(npos);
+            stack.push([r, nc4, dist + 1]);
+          }
         }
       }
     }
-
-    visited.delete(node);
-    return maxDist;
   }
 
-  return dfs(start);
+  // Flatten to typed arrays with offsets
+  const offsets = new Uint32Array(numJunctions + 1);
+  let totalEdges = 0;
+  for (let i = 0; i < numJunctions; i++) {
+    offsets[i] = totalEdges;
+    totalEdges += tempAdj[i].length / 2;
+  }
+  offsets[numJunctions] = totalEdges;
+
+  const neighbors = new Uint8Array(totalEdges);
+  const dists = new Uint16Array(totalEdges);
+
+  for (let i = 0; i < numJunctions; i++) {
+    const edges = tempAdj[i];
+    let idx = offsets[i];
+    for (let j = 0; j < edges.length; j += 2) {
+      neighbors[idx] = edges[j];
+      dists[idx] = edges[j + 1];
+      idx++;
+    }
+  }
+
+  return { offsets, neighbors, dists };
+}
+
+function longestPath(graph, startIdx, endIdx, numNodes) {
+  const { offsets, neighbors, dists } = graph;
+  const visited = new Uint8Array(numNodes);
+  let maxDist = -1;
+
+  function dfs(node, dist) {
+    if (node === endIdx) {
+      if (dist > maxDist) maxDist = dist;
+      return;
+    }
+
+    visited[node] = 1;
+
+    const start = offsets[node];
+    const end = offsets[node + 1];
+    for (let i = start; i < end; i++) {
+      const neighbor = neighbors[i];
+      if (visited[neighbor] === 0) {
+        dfs(neighbor, dist + dists[i]);
+      }
+    }
+
+    visited[node] = 0;
+  }
+
+  dfs(startIdx, 0);
+  return maxDist;
 }
 
 function solve(grid, respectSlopes) {
   const rows = grid.length;
+  const cols = grid[0].length;
   const startCol = grid[0].indexOf('.');
   const endCol = grid[rows - 1].indexOf('.');
-  const start = `0,${startCol}`;
-  const end = `${rows - 1},${endCol}`;
 
-  const junctions = findJunctions(grid);
-  const graph = buildGraph(grid, junctions, respectSlopes);
+  const startPos = 0 * cols + startCol;
+  const endPos = (rows - 1) * cols + endCol;
 
-  return longestPathDFS(graph, start, end);
+  const junctionData = findJunctions(grid);
+  const startIdx = junctionData.posToIndex.get(startPos);
+  const endIdx = junctionData.posToIndex.get(endPos);
+
+  const graph = buildGraph(grid, junctionData, respectSlopes);
+
+  return longestPath(graph, startIdx, endIdx, junctionData.junctions.length);
 }
 
 function part1(grid) {
