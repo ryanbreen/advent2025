@@ -34,6 +34,7 @@ end_pos:        .skip 8                     // End position
 // Junction data
 junctions:      .skip MAX_JUNCTIONS * 8     // Array of (row << 32 | col)
 junction_count: .skip 8                     // Number of junctions
+junction_index: .skip MAX_GRID_SIZE * MAX_GRID_SIZE  // -1 (0xFF) if not junction, else index
 
 // Graph adjacency list: for each junction, store (neighbor_idx, distance) pairs
 // graph[i][j] = (neighbor_index << 32) | distance
@@ -214,6 +215,7 @@ _no_extra_row:
 
 // ============================================================================
 // Find all junction points (start, end, cells with 3+ neighbors)
+// Also builds junction_index lookup table for O(1) junction checks
 // ============================================================================
 _find_junctions:
     stp x29, x30, [sp, #-16]!
@@ -221,6 +223,7 @@ _find_junctions:
     stp x21, x22, [sp, #-16]!
     stp x23, x24, [sp, #-16]!
     stp x25, x26, [sp, #-16]!
+    stp x27, x28, [sp, #-16]!
     mov x29, sp
 
     adrp x19, grid@PAGE
@@ -231,6 +234,32 @@ _find_junctions:
     adrp x0, grid_cols@PAGE
     add x0, x0, grid_cols@PAGEOFF
     ldr x21, [x0]               // cols
+
+    // Initialize junction_index to 0xFF (-1 as byte) - use unrolled 128-byte clears
+    adrp x27, junction_index@PAGE
+    add x27, x27, junction_index@PAGEOFF
+    mov x0, x27
+    mov x1, #0xFFFFFFFFFFFFFFFF  // All 0xFF bytes
+    mov x2, #MAX_GRID_SIZE * MAX_GRID_SIZE / 128  // 175 iterations
+_clear_junction_index:
+    stp x1, x1, [x0], #16
+    stp x1, x1, [x0], #16
+    stp x1, x1, [x0], #16
+    stp x1, x1, [x0], #16
+    stp x1, x1, [x0], #16
+    stp x1, x1, [x0], #16
+    stp x1, x1, [x0], #16
+    stp x1, x1, [x0], #16
+    subs x2, x2, #1
+    b.gt _clear_junction_index
+    // Clear remaining 100 bytes
+    stp x1, x1, [x0], #16
+    stp x1, x1, [x0], #16
+    stp x1, x1, [x0], #16
+    stp x1, x1, [x0], #16
+    stp x1, x1, [x0], #16
+    stp x1, x1, [x0], #16
+    str w1, [x0]
 
     adrp x22, junctions@PAGE
     add x22, x22, junctions@PAGEOFF
@@ -246,10 +275,13 @@ _find_start:
     b _find_start
 _found_start:
     // Store start position (row=0, col=x0)
-    mov x1, x0
-    mov x0, #0
+    mov x1, x0                  // col
+    mov x28, x0                 // save col in x28
+    mov x0, #0                  // row = 0
     orr x2, x1, x0, lsl #32     // Pack as (row << 32 | col)
     str x2, [x22], #8
+    // Store in junction_index[0][col] = 0
+    strb w23, [x27, x28]        // junction_index[col] = 0 (first junction)
     add x23, x23, #1
     adrp x3, start_pos@PAGE
     add x3, x3, start_pos@PAGEOFF
@@ -268,9 +300,13 @@ _find_end:
     b _find_end
 _found_end:
     // Store end position
-    sub x0, x20, #1
+    sub x0, x20, #1             // row = rows-1
     orr x2, x4, x0, lsl #32
     str x2, [x22], #8
+    // Store in junction_index[row][col] = 1
+    mul x5, x0, x21
+    add x5, x5, x4              // offset = row * cols + col
+    strb w23, [x27, x5]         // junction_index[row][col] = 1
     add x23, x23, #1
     adrp x3, end_pos@PAGE
     add x3, x3, end_pos@PAGEOFF
@@ -351,22 +387,18 @@ _skip_right:
     cmp x26, #3
     b.lt _junction_next_col
 
-    // Check if already added (start/end might overlap)
-    orr x0, x25, x24, lsl #32
-    adrp x1, junctions@PAGE
-    add x1, x1, junctions@PAGEOFF
-    mov x2, #0
-_check_dup:
-    cmp x2, x23
-    b.ge _add_junction
-    ldr x3, [x1, x2, lsl #3]
-    cmp x3, x0
-    b.eq _junction_next_col      // Already exists
-    add x2, x2, #1
-    b _check_dup
+    // Check junction_index to see if already added
+    mul x0, x24, x21
+    add x0, x0, x25
+    ldrb w1, [x27, x0]
+    cmp w1, #0xFF
+    b.ne _junction_next_col      // Already exists (not 0xFF)
 
-_add_junction:
-    str x0, [x22], #8
+    // Add junction
+    orr x2, x25, x24, lsl #32
+    str x2, [x22], #8
+    // Store in junction_index
+    strb w23, [x27, x0]
     add x23, x23, #1
 
 _junction_next_col:
@@ -382,6 +414,7 @@ _junction_done:
     add x0, x0, junction_count@PAGEOFF
     str x23, [x0]
 
+    ldp x27, x28, [sp], #16
     ldp x25, x26, [sp], #16
     ldp x23, x24, [sp], #16
     ldp x21, x22, [sp], #16
@@ -405,23 +438,32 @@ _build_graph:
 
     str x0, [sp, #0]            // respect_slopes
 
-    // Clear graph
+    // Clear graph (8192 bytes)
+    // Unrolled 4x: clear 64 bytes per iteration (128 * 64 = 8192)
     adrp x0, graph@PAGE
     add x0, x0, graph@PAGEOFF
-    mov x1, #0
-    mov x2, #MAX_JUNCTIONS * MAX_EDGES * 8
+    mov x2, #128                 // 8192 / 64 = 128
 _clear_graph:
-    str x1, [x0], #8
-    subs x2, x2, #8
+    stp xzr, xzr, [x0]
+    stp xzr, xzr, [x0, #16]
+    stp xzr, xzr, [x0, #32]
+    stp xzr, xzr, [x0, #48]
+    add x0, x0, #64
+    subs x2, x2, #1
     b.gt _clear_graph
 
+    // Clear graph_sizes (512 bytes)
+    // Unrolled 4x: clear 64 bytes per iteration (8 * 64 = 512)
     adrp x0, graph_sizes@PAGE
     add x0, x0, graph_sizes@PAGEOFF
-    mov x1, #0
-    mov x2, #MAX_JUNCTIONS * 8
+    mov x2, #8                   // 512 / 64 = 8
 _clear_sizes:
-    str x1, [x0], #8
-    subs x2, x2, #8
+    stp xzr, xzr, [x0]
+    stp xzr, xzr, [x0, #16]
+    stp xzr, xzr, [x0, #32]
+    stp xzr, xzr, [x0, #48]
+    add x0, x0, #64
+    subs x2, x2, #1
     b.gt _clear_sizes
 
     adrp x19, grid@PAGE
@@ -437,6 +479,10 @@ _clear_sizes:
     adrp x0, junction_count@PAGE
     add x0, x0, junction_count@PAGEOFF
     ldr x23, [x0]               // num junctions
+    // Store junction_index pointer for O(1) lookups
+    adrp x0, junction_index@PAGE
+    add x0, x0, junction_index@PAGEOFF
+    str x0, [sp, #32]           // junction_index base
 
     // For each junction, BFS to find reachable junctions
     mov x24, #0                 // junction index
@@ -448,27 +494,41 @@ _build_junction_loop:
     // Get junction position
     ldr x25, [x22, x24, lsl #3] // start_junction
 
-    // Clear BFS visited
+    // Clear BFS visited (22,500 bytes)
+    // Unrolled 8x: clear 128 bytes per iteration (175 * 128 = 22400, remainder = 100)
     adrp x0, bfs_visited@PAGE
     add x0, x0, bfs_visited@PAGEOFF
-    mov x1, #0
-    mov x2, #MAX_GRID_SIZE * MAX_GRID_SIZE
+    mov x2, #175
 _clear_visited:
-    strb w1, [x0], #1
+    stp xzr, xzr, [x0], #16
+    stp xzr, xzr, [x0], #16
+    stp xzr, xzr, [x0], #16
+    stp xzr, xzr, [x0], #16
+    stp xzr, xzr, [x0], #16
+    stp xzr, xzr, [x0], #16
+    stp xzr, xzr, [x0], #16
+    stp xzr, xzr, [x0], #16
     subs x2, x2, #1
     b.gt _clear_visited
+    // Clear remaining 100 bytes (6*16 + 4 = 100)
+    stp xzr, xzr, [x0], #16
+    stp xzr, xzr, [x0], #16
+    stp xzr, xzr, [x0], #16
+    stp xzr, xzr, [x0], #16
+    stp xzr, xzr, [x0], #16
+    stp xzr, xzr, [x0], #16
+    str wzr, [x0]
 
-    // Initialize queue with start junction
+    // Initialize stack with start junction (use LIFO for cache locality)
     adrp x26, bfs_queue@PAGE
-    add x26, x26, bfs_queue@PAGEOFF  // queue base
-    mov x27, #0                 // queue front
-    mov x28, #1                 // queue size (starts at 1)
+    add x26, x26, bfs_queue@PAGEOFF  // stack base
+    mov x28, #1                 // stack size (starts at 1)
 
     // Extract row and col
     lsr x0, x25, #32            // row
     and x1, x25, #0xFFFFFFFF    // col
 
-    // Store in queue: (row, col, dist=0) at position 0
+    // Push to stack: (row, col, dist=0) at position 0
     str x0, [x26, #0]
     str x1, [x26, #8]
     str xzr, [x26, #16]
@@ -485,16 +545,16 @@ _bfs_loop:
     cmp x28, #0
     b.eq _bfs_done
 
-    // Dequeue - calculate offset for front element
-    mov x0, #24
-    mul x0, x27, x0
+    // Pop from stack - get top element at index (size-1)
+    sub x0, x28, #1
+    mov x27, #24
+    mul x0, x0, x27
     add x0, x26, x0
 
     ldr x1, [x0, #0]            // row
     ldr x2, [x0, #8]            // col
     ldr x3, [x0, #16]           // dist
-    add x27, x27, #1
-    sub x28, x28, #1
+    sub x28, x28, #1            // decrement stack size
 
     str x1, [sp, #8]            // current row
     str x2, [sp, #16]           // current col
@@ -504,19 +564,13 @@ _bfs_loop:
     cmp x3, #0
     b.eq _explore_neighbors
 
-    // Pack position
-    orr x4, x2, x1, lsl #32
-
-    // Check if it's a junction
-    mov x5, #0
-_check_is_junction:
-    cmp x5, x23
-    b.ge _explore_neighbors
-    ldr x6, [x22, x5, lsl #3]
-    cmp x6, x4
-    b.eq _found_junction_neighbor
-    add x5, x5, #1
-    b _check_is_junction
+    // O(1) junction lookup using junction_index[row][col]
+    mul x4, x1, x21             // row * cols
+    add x4, x4, x2              // + col
+    ldr x6, [sp, #32]           // junction_index base
+    ldrb w5, [x6, x4]           // junction_index[row * cols + col]
+    cmp w5, #0xFF
+    b.eq _explore_neighbors     // Not a junction (0xFF = -1)
 
 _found_junction_neighbor:
     // Don't record edge to self
@@ -529,8 +583,8 @@ _found_junction_neighbor:
     ldr x7, [x6, x24, lsl #3]   // current size
 
     // Calculate offset: x24 * MAX_EDGES + x7
-    mov x8, #MAX_EDGES
-    mul x9, x24, x8
+    // MAX_EDGES = 16, so x24 * 16 = x24 << 4
+    lsl x9, x24, #4
     add x9, x9, x7
 
     // Store edge
@@ -660,18 +714,17 @@ _no_slope_check:
     mov w4, #1
     strb w4, [x0, x17]
 
-    // Enqueue (nr, nc, dist+1)
-    add x0, x27, x28            // queue end index
+    // Push to stack (nr, nc, dist+1)
     mov x4, #24
-    mul x4, x0, x4
-    add x4, x26, x4
+    mul x4, x28, x4             // stack_size * 24
+    add x4, x26, x4             // stack base + offset
 
     str x15, [x4, #0]           // nr
     str x16, [x4, #8]           // nc
     add x5, x3, #1
     str x5, [x4, #16]           // dist + 1
 
-    add x28, x28, #1
+    add x28, x28, #1            // increment stack size
 
 _next_dir:
     add x12, x12, #1
@@ -695,139 +748,108 @@ _build_done:
     ret
 
 // ============================================================================
-// Find longest path using DFS with backtracking
+// Find longest path using DFS with backtracking (recursive implementation)
 // Returns longest distance in x0
 // ============================================================================
 _longest_path_dfs:
     stp x29, x30, [sp, #-16]!
     stp x19, x20, [sp, #-16]!
     stp x21, x22, [sp, #-16]!
-    stp x23, x24, [sp, #-16]!
-    stp x25, x26, [sp, #-16]!
-    stp x27, x28, [sp, #-16]!
     mov x29, sp
 
-    // Find start junction index (should be 0)
-    mov x19, #0                 // start_idx
+    // Set up constants for recursive DFS
+    adrp x19, graph@PAGE
+    add x19, x19, graph@PAGEOFF
+    adrp x20, graph_sizes@PAGE
+    add x20, x20, graph_sizes@PAGEOFF
 
-    // Find end junction index (should be 1)
-    mov x20, #1                 // end_idx
+    // Call recursive DFS: dfs(node=0, visited=0)
+    // x0 = node, x1 = visited_mask
+    // x19 = graph base, x20 = graph_sizes base, x21 = end_idx (1)
+    mov x21, #1                 // end_idx constant
+    mov x0, #0                  // start node
+    mov x1, #0                  // visited = empty (self-marking)
+    bl _dfs_recursive
 
-    adrp x21, graph@PAGE
-    add x21, x21, graph@PAGEOFF
-    adrp x22, graph_sizes@PAGE
-    add x22, x22, graph_sizes@PAGEOFF
-    adrp x0, junction_count@PAGE
-    add x0, x0, junction_count@PAGEOFF
-    ldr x23, [x0]               // num junctions
-
-    // Initialize DFS
-    mov x24, #0                 // max_dist found
-    mov x25, #0                 // visited bitmask
-
-    adrp x26, dfs_stack@PAGE
-    add x26, x26, dfs_stack@PAGEOFF
-    mov x27, #0                 // stack size
-
-    // Push start: (junction=0, edge_idx=0, current_dist=0)
-    str x19, [x26, #0]          // junction_idx
-    str xzr, [x26, #8]          // edge_idx
-    str xzr, [x26, #16]         // current_dist
-    mov x27, #1
-
-    // Mark start as visited
-    mov x0, #1
-    lsl x0, x0, x19
-    orr x25, x25, x0
-
-_dfs_loop:
-    cbz x27, _dfs_done
-
-    // Peek top of stack
-    sub x0, x27, #1
-    mov x1, #24
-    mul x0, x0, x1
-    add x0, x26, x0
-
-    ldr x1, [x0, #0]            // junction_idx
-    ldr x2, [x0, #8]            // edge_idx
-    ldr x3, [x0, #16]           // current_dist
-
-    // Check if at end
-    cmp x1, x20
-    b.ne _not_at_end
-
-    // Update max_dist if better
-    cmp x3, x24
-    csel x24, x3, x24, gt
-
-    // Pop and backtrack
-    sub x27, x27, #1
-    mov x4, #1
-    lsl x4, x4, x1
-    bic x25, x25, x4            // Unmark visited
-    b _dfs_loop
-
-_not_at_end:
-    // Get number of edges for this junction
-    ldr x4, [x22, x1, lsl #3]   // num_edges
-
-    // If we've tried all edges, pop and backtrack
-    cmp x2, x4
-    b.lt _try_next_edge
-
-    // Pop
-    sub x27, x27, #1
-    mov x4, #1
-    lsl x4, x4, x1
-    bic x25, x25, x4            // Unmark visited
-    b _dfs_loop
-
-_try_next_edge:
-    // Get edge: graph[junction_idx][edge_idx]
-    mov x5, #MAX_EDGES
-    mul x5, x1, x5
-    add x5, x5, x2
-    ldr x6, [x21, x5, lsl #3]   // (neighbor_idx << 32) | distance
-
-    // Increment edge_idx in stack
-    add x2, x2, #1
-    str x2, [x0, #8]
-
-    // Extract neighbor and distance
-    lsr x7, x6, #32             // neighbor_idx
-    and x8, x6, #0xFFFFFFFF     // edge_distance
-
-    // Check if neighbor is visited
-    mov x9, #1
-    lsl x9, x9, x7
-    tst x25, x9
-    b.ne _dfs_loop               // Already visited, try next edge
-
-    // Mark neighbor as visited
-    orr x25, x25, x9
-
-    // Push neighbor onto stack
-    mov x10, #24
-    mul x10, x27, x10
-    add x10, x26, x10
-
-    str x7, [x10, #0]           // neighbor_idx
-    str xzr, [x10, #8]          // edge_idx = 0
-    add x11, x3, x8             // new distance
-    str x11, [x10, #16]         // current_dist + edge_distance
-
-    add x27, x27, #1
-    b _dfs_loop
-
-_dfs_done:
-    mov x0, x24                 // Return max_dist
-
-    ldp x27, x28, [sp], #16
-    ldp x25, x26, [sp], #16
-    ldp x23, x24, [sp], #16
     ldp x21, x22, [sp], #16
     ldp x19, x20, [sp], #16
+    ldp x29, x30, [sp], #16
+    ret
+
+// Recursive DFS function (C-style: returns distance from node to end)
+// x0 = node, x1 = visited_mask
+// x19 = graph base (preserved), x20 = graph_sizes base (preserved), x21 = end_idx (preserved)
+// Returns max distance from node to end in x0, or -1 if no path
+_dfs_recursive:
+    // Check if at end
+    cmp x0, x21
+    b.ne _dfs_not_end
+    mov x0, #0                  // Return 0 at end
+    ret
+
+_dfs_not_end:
+    stp x29, x30, [sp, #-16]!
+    stp x22, x23, [sp, #-16]!
+    stp x24, x25, [sp, #-16]!
+    stp x26, x27, [sp, #-16]!
+    mov x29, sp
+
+    // Mark self as visited
+    mov x3, #1
+    lsl x3, x3, x0
+    orr x23, x1, x3             // x23 = visited_mask with self marked
+
+    mov x24, #-1                // max_dist = -1
+
+    // Get number of edges: graph_sizes[node]
+    ldr x25, [x20, x0, lsl #3]  // count
+    cbz x25, _dfs_edge_done     // Skip if no edges
+
+    // Calculate edge pointer: graph + (node * 16) * 8 = graph + node * 128
+    lsl x26, x0, #7             // node * 128
+    add x26, x19, x26           // edge_ptr = graph + node * 128
+
+    // Calculate end pointer: edge_ptr + count * 8
+    add x27, x26, x25, lsl #3   // edge_end = edge_ptr + count * 8
+
+_dfs_edge_loop:
+    // Load edge
+    ldr x0, [x26], #8           // load and advance
+
+    // Extract neighbor and weight
+    lsr x1, x0, #32             // neighbor_idx
+    and x22, x0, #0xFFFFFFFF    // weight (x22 available since we saved it)
+
+    // Check if neighbor visited (optimized: shift visited right by neighbor_idx, test bit 0)
+    lsr x3, x23, x1
+    tbnz x3, #0, _dfs_check_loop  // Skip if bit 0 set (visited)
+
+    // Recursive call
+    mov x0, x1                  // neighbor
+    mov x1, x23                 // visited
+    bl _dfs_recursive
+
+    // Check result
+    cmp x0, #0
+    b.lt _dfs_check_loop        // Skip if no path
+
+    // total = weight + result
+    add x0, x22, x0
+
+    // Update max_dist if better
+    cmp x0, x24
+    csel x24, x0, x24, gt
+
+_dfs_check_loop:
+    cmp x26, x27
+    b.lt _dfs_edge_loop
+
+_dfs_edge_done:
+    mov x0, x24                 // Return max_dist
+
+    ldp x26, x27, [sp], #16
+    ldp x24, x25, [sp], #16
+    ldp x22, x23, [sp], #16
     ldp x29, x30, [sp], #16
     ret
 

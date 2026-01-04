@@ -60,7 +60,7 @@ The visited set uses a **bitmask** (since V < 64) for O(1) add/remove operations
 - **Zig (168ms)**: Competitive with C++/Rust.
 - **C (169ms)**: Compact adjacency lists with bitmask visited tracking.
 - **Go (186ms)**: Bitmask visited + integer-indexed adjacency list.
-- **ARM64 (216ms)**: Hand-written assembly with bitmask tracking.
+- **ARM64 (169ms)**: Hand-written assembly with recursive DFS and bitmask tracking.
 - **Java (397ms)**: Primitive arrays + bitmask, well-optimized.
 - **Node.js (405ms)**: TypedArrays for visited/adjacency, integer indices.
 - **Common Lisp (4.0s)**: SBCL performs well with hash-table tracking.
@@ -80,8 +80,8 @@ The visited set uses a **bitmask** (since V < 64) for O(1) add/remove operations
 | Rust        | 161.4        | 1.9         |
 | Zig         | 168.1        | 1.9         |
 | C           | 169.2        | 1.7         |
+| ARM64       | 169.2        | 1.5         |
 | Go          | 186.4        | 5.7         |
-| ARM64       | 215.9        | 1.4         |
 | Java        | 396.6        | 50.3        |
 | Node.js     | 405.4        | 50.4        |
 | Common Lisp | 4,001.3      | 53.0        |
