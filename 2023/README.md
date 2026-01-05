@@ -30,6 +30,7 @@ Solutions implemented in 16 languages.
 | 22  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 23  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 24  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
+| 25  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 
 ## Benchmarks
 
@@ -545,3 +546,24 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Clojure     | 604.3        | 294.8       |
 | ColdFusion  | 7,550.1      | 1,129.6     |
 | Bash        | 22,092.1     | 268.5       |
+
+### Day 25: Snowverload
+
+| Language    | Runtime (ms) | Memory (MB) |
+|-------------|--------------|-------------|
+| ARM64       | 8.2          | 1.9         |
+| Java        | 58.7         | 47.9        |
+| Zig         | 140.3        | 3.2         |
+| Rust        | 144.7        | 4.9         |
+| Node.js     | 177.2        | 70.7        |
+| Go          | 181.5        | 27.8        |
+| PHP         | 259.3        | 27.6        |
+| Python      | 270.6        | 17.5        |
+| C           | 299.0        | 29.2        |
+| Common Lisp | 305.8        | 90.7        |
+| Perl        | 424.7        | 8.6         |
+| C++         | 489.3        | 3.6         |
+| Ruby        | 600.7        | 31.0        |
+| Clojure     | 895.7        | 801.8       |
+| ColdFusion  | 4,003.1      | 1,063.7     |
+| Bash        | >300,000     | ~10         |
