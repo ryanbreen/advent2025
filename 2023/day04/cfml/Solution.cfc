@@ -12,8 +12,8 @@ component {
         var part1Result = part1(lines);
         var part2Result = part2(lines);
 
-        print.line("Part 1: " & part1Result);
-        print.line("Part 2: " & part2Result);
+        writeOutput("Part 1: " & part1Result & chr(10));
+        writeOutput("Part 2: " & part2Result & chr(10));
     }
 
     function parseCards(lines) {

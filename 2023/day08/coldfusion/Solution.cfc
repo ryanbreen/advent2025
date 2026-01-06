@@ -14,11 +14,11 @@ component {
 
         // Solve Part 1
         var part1Result = part1(instructions, network);
-        print.line("Part 1: " & part1Result);
+        writeOutput("Part 1: " & part1Result & chr(10));
 
         // Solve Part 2
         var part2Result = part2(instructions, network);
-        print.line("Part 2: " & part2Result);
+        writeOutput("Part 2: " & part2Result & chr(10));
     }
 
     function parseInput(text) {

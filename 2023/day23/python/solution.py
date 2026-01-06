@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """Day 23: A Long Walk - Longest path through hiking trails."""
 
+import sys
 from pathlib import Path
 from collections import defaultdict
+
+# Increase recursion limit for deep DFS
+sys.setrecursionlimit(100000)
 
 DIRECTIONS = ((-1, 0), (1, 0), (0, -1), (0, 1))
 SLOPE_DIRS = {'^': (-1, 0), 'v': (1, 0), '<': (0, -1), '>': (0, 1)}
@@ -75,26 +79,51 @@ def build_graph(grid: list[str], junctions: set[tuple[int, int]], respect_slopes
 
 
 def longest_path_dfs(graph: dict, start: tuple[int, int], end: tuple[int, int]) -> int:
-    """Find longest path using DFS with backtracking."""
-    visited = set()
+    """Find longest path using recursive DFS with aggressive optimization."""
+    # Build node index mapping for bitmasking
+    all_nodes = set(graph.keys())
+    for neighbors in graph.values():
+        all_nodes.update(neighbors.keys())
 
-    def dfs(node: tuple[int, int]) -> int:
-        if node == end:
-            return 0
+    nodes = sorted(all_nodes)
+    node_to_idx = {node: idx for idx, node in enumerate(nodes)}
+    start_idx = node_to_idx[start]
+    end_idx = node_to_idx[end]
 
-        visited.add(node)
-        max_dist = -1
+    # Pre-compute bit masks for each node
+    num_nodes = len(nodes)
+    bit_masks = [1 << i for i in range(num_nodes)]
 
-        for neighbor, dist in graph[node].items():
-            if neighbor not in visited:
-                result = dfs(neighbor)
-                if result >= 0:
-                    max_dist = max(max_dist, dist + result)
+    # Convert graph to list of lists for maximum speed
+    # Each entry is a list of (neighbor_idx, distance, bit_mask) tuples
+    indexed_graph = []
+    for node in nodes:
+        if node in graph:
+            edges = [(node_to_idx[neighbor], dist, bit_masks[node_to_idx[neighbor]])
+                     for neighbor, dist in graph[node].items()]
+        else:
+            edges = []
+        indexed_graph.append(edges)
 
-        visited.remove(node)
-        return max_dist
+    # Use nonlocal variable (faster than list index)
+    max_dist = 0
 
-    return dfs(start)
+    # Inline the critical path - avoid any unnecessary operations
+    def dfs(node_idx, visited_mask, current_dist):
+        nonlocal max_dist
+        if node_idx == end_idx:
+            if current_dist > max_dist:
+                max_dist = current_dist
+            return
+
+        # Use pre-computed bit masks
+        for neighbor_idx, dist, bit_mask in indexed_graph[node_idx]:
+            if not (visited_mask & bit_mask):
+                dfs(neighbor_idx, visited_mask | bit_mask, current_dist + dist)
+
+    # Start DFS
+    dfs(start_idx, bit_masks[start_idx], 0)
+    return max_dist
 
 
 def solve(grid: list[str], respect_slopes: bool) -> int:

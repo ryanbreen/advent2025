@@ -46,6 +46,7 @@ No computation required - this is the traditional AoC finale that unlocks when y
 ## Language-Specific Notes
 
 - **ARM64**: Exceptionally fast implementation using optimized graph traversal (8ms)
+- **C++**: Near-optimal performance using adjacency lists and integer-indexed edge lookup (15ms)
 - **Java**: Benefits from JIT optimization on repeated graph operations (59ms)
 - **Zig/Rust**: Fast compiled performance (~140ms)
 - **Node.js**: Efficient JavaScript V8 engine for graph operations (177ms)
@@ -57,6 +58,7 @@ No computation required - this is the traditional AoC finale that unlocks when y
 | Language | Runtime (ms) | Memory (MB) |
 |----------|--------------|-------------|
 | ARM64 | 8.2 | 1.9 |
+| C++ | 14.9 | 33.9 |
 | Java | 58.7 | 47.9 |
 | Zig | 140.3 | 3.2 |
 | Rust | 144.7 | 4.9 |
@@ -67,7 +69,6 @@ No computation required - this is the traditional AoC finale that unlocks when y
 | C | 299.0 | 29.2 |
 | Common Lisp | 305.8 | 90.7 |
 | Perl | 424.7 | 8.6 |
-| C++ | 489.3 | 3.6 |
 | Ruby | 600.7 | 31.0 |
 | Clojure | 895.7 | 801.8 |
 | ColdFusion | 4003.1 | 1063.7 |

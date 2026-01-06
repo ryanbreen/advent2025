@@ -2,22 +2,45 @@
 #include <fstream>
 #include <string>
 #include <vector>
-#include <map>
-#include <set>
+#include <unordered_map>
+#include <unordered_set>
 #include <queue>
 #include <algorithm>
-#include <random>
 #include <sstream>
+#include <cstring>
 
 using namespace std;
 
-// Graph represented as adjacency list
-using Graph = map<string, set<string>>;
-using Edge = pair<string, string>;
+// Optimized graph representation using integer node IDs
+constexpr int MAX_NODES = 2048;
+constexpr int SAMPLE_SIZE = 100;
+constexpr int TOP_CANDIDATES = 20;
 
-// Parse input into graph
-Graph parse_input(const string& filename) {
-    Graph graph;
+struct Edge {
+    int u, v;
+    double betweenness;
+};
+
+// Global data structures (stack allocation for performance)
+static vector<int> adj_list[MAX_NODES];       // Adjacency list for fast neighbor iteration
+static int edge_index[MAX_NODES][MAX_NODES];  // Quick edge lookup
+static int node_count = 0;
+static unordered_map<string, int> name_to_id;
+static vector<Edge> edges;
+
+// Get or create node ID
+int get_node_id(const string& name) {
+    auto it = name_to_id.find(name);
+    if (it != name_to_id.end()) {
+        return it->second;
+    }
+    int id = node_count++;
+    name_to_id[name] = id;
+    return id;
+}
+
+// Parse input into adjacency list
+void parse_input(const string& filename) {
     ifstream file(filename);
     string line;
 
@@ -28,168 +51,171 @@ Graph parse_input(const string& filename) {
         string left = line.substr(0, colon_pos);
         string right_part = line.substr(colon_pos + 2);
 
+        int left_id = get_node_id(left);
+
         istringstream iss(right_part);
         string neighbor;
         while (iss >> neighbor) {
-            graph[left].insert(neighbor);
-            graph[neighbor].insert(left);
+            int right_id = get_node_id(neighbor);
+            adj_list[left_id].push_back(right_id);
+            adj_list[right_id].push_back(left_id);
         }
     }
-
-    return graph;
-}
-
-// Normalize edge (always sorted order)
-Edge make_edge(const string& a, const string& b) {
-    return a < b ? make_pair(a, b) : make_pair(b, a);
 }
 
 // BFS to find component size, excluding certain edges
-int bfs_component_size(const Graph& graph, const string& start, const set<Edge>& excluded_edges) {
-    set<string> visited;
-    queue<string> q;
+int bfs_component_size(int start, const bool excluded[]) {
+    bool visited[MAX_NODES] = {false};
+    int queue[MAX_NODES];
+    int front = 0, back = 0;
 
-    visited.insert(start);
-    q.push(start);
+    visited[start] = true;
+    queue[back++] = start;
+    int count = 1;
 
-    while (!q.empty()) {
-        string node = q.front();
-        q.pop();
+    while (front < back) {
+        int node = queue[front++];
 
-        auto it = graph.find(node);
-        if (it == graph.end()) continue;
+        for (int neighbor : adj_list[node]) {
+            if (visited[neighbor]) continue;
 
-        for (const string& neighbor : it->second) {
-            Edge edge = make_edge(node, neighbor);
-            if (visited.find(neighbor) == visited.end() &&
-                excluded_edges.find(edge) == excluded_edges.end()) {
-                visited.insert(neighbor);
-                q.push(neighbor);
+            // Check if this edge is excluded
+            bool skip = false;
+            if (excluded) {
+                for (size_t i = 0; i < edges.size(); i++) {
+                    if (!excluded[i]) continue;
+                    if ((edges[i].u == node && edges[i].v == neighbor) ||
+                        (edges[i].v == node && edges[i].u == neighbor)) {
+                        skip = true;
+                        break;
+                    }
+                }
+            }
+            if (skip) continue;
+
+            visited[neighbor] = true;
+            queue[back++] = neighbor;
+            count++;
+        }
+    }
+
+    return count;
+}
+
+// Compute edge betweenness using Brandes algorithm
+void compute_edge_betweenness() {
+    // Build edges list and index
+    edges.clear();
+    memset(edge_index, -1, sizeof(edge_index));
+
+    for (int u = 0; u < node_count; u++) {
+        for (int v : adj_list[u]) {
+            if (u < v) {  // Only add each edge once
+                int idx = edges.size();
+                edges.push_back({u, v, 0.0});
+                edge_index[u][v] = idx;
+                edge_index[v][u] = idx;
             }
         }
     }
 
-    return visited.size();
-}
+    // Deterministic sampling
+    int sample_count = min(node_count, SAMPLE_SIZE);
+    int step = node_count / sample_count;
+    if (step < 1) step = 1;
 
-// Compute edge betweenness centrality using BFS from sampled nodes
-map<Edge, double> compute_edge_betweenness(const Graph& graph, int sample_nodes = 100) {
-    map<Edge, double> edge_count;
-
-    // Get all nodes
-    vector<string> nodes;
-    for (const auto& pair : graph) {
-        nodes.push_back(pair.first);
+    // Allocate predecessor arrays
+    vector<vector<int>> pred(MAX_NODES);
+    for (int i = 0; i < MAX_NODES; i++) {
+        pred[i].reserve(MAX_NODES);
     }
 
-    // Sample nodes for efficiency
-    vector<string> sample;
-    if (sample_nodes > 0 && (int)nodes.size() > sample_nodes) {
-        mt19937 rng(42);
-        shuffle(nodes.begin(), nodes.end(), rng);
-        sample.assign(nodes.begin(), nodes.begin() + sample_nodes);
-    } else {
-        sample = nodes;
-    }
-
-    // For each source node, compute shortest paths
-    for (const string& source : sample) {
-        map<string, int> dist;
-        map<string, vector<string>> pred;
-        queue<string> q;
-
-        dist[source] = 0;
-        q.push(source);
+    // For each sampled source node
+    for (int s_idx = 0; s_idx < sample_count; s_idx++) {
+        int source = (s_idx * step) % node_count;
 
         // BFS to find shortest paths
-        while (!q.empty()) {
-            string node = q.front();
-            q.pop();
+        int dist[MAX_NODES];
+        double num_paths[MAX_NODES];
 
-            auto it = graph.find(node);
-            if (it == graph.end()) continue;
+        fill_n(dist, node_count, -1);
+        fill_n(num_paths, node_count, 0.0);
 
-            for (const string& neighbor : it->second) {
-                if (dist.find(neighbor) == dist.end()) {
+        for (auto& p : pred) p.clear();
+
+        dist[source] = 0;
+        num_paths[source] = 1.0;
+
+        int queue[MAX_NODES];
+        int front = 0, back = 0;
+        queue[back++] = source;
+
+        int visited_order[MAX_NODES];
+        int visited_count = 0;
+
+        while (front < back) {
+            int node = queue[front++];
+            visited_order[visited_count++] = node;
+
+            for (int neighbor : adj_list[node]) {
+                if (dist[neighbor] == -1) {
                     dist[neighbor] = dist[node] + 1;
+                    queue[back++] = neighbor;
+                }
+
+                if (dist[neighbor] == dist[node] + 1) {
                     pred[neighbor].push_back(node);
-                    q.push(neighbor);
-                } else if (dist[neighbor] == dist[node] + 1) {
-                    pred[neighbor].push_back(node);
+                    num_paths[neighbor] += num_paths[node];
                 }
             }
         }
 
-        // Count number of shortest paths to each node
-        map<string, double> num_paths;
-        num_paths[source] = 1.0;
-
-        // Process nodes in order of increasing distance
-        vector<pair<int, string>> ordered;
-        for (const auto& d : dist) {
-            ordered.push_back({d.second, d.first});
-        }
-        sort(ordered.begin(), ordered.end());
-
-        for (const auto& p : ordered) {
-            const string& node = p.second;
-            for (const string& predecessor : pred[node]) {
-                num_paths[node] += num_paths[predecessor];
-            }
-        }
-
         // Accumulate edge betweenness (reverse order)
-        map<string, double> dependency;
-        reverse(ordered.begin(), ordered.end());
+        double dependency[MAX_NODES] = {0.0};
 
-        for (const auto& p : ordered) {
-            const string& node = p.second;
-            for (const string& predecessor : pred[node]) {
-                Edge edge = make_edge(predecessor, node);
-                double frac = num_paths[predecessor] / num_paths[node];
+        for (int i = visited_count - 1; i >= 0; i--) {
+            int node = visited_order[i];
+
+            for (int p : pred[node]) {
+                double frac = num_paths[p] / num_paths[node];
                 double contrib = frac * (1.0 + dependency[node]);
-                edge_count[edge] += contrib;
-                dependency[predecessor] += contrib;
+
+                // Add to edge betweenness using fast lookup
+                int idx = edge_index[p][node];
+                if (idx >= 0) {
+                    edges[idx].betweenness += contrib;
+                }
+
+                dependency[p] += contrib;
             }
         }
     }
-
-    return edge_count;
 }
 
-// Find the 3 edges to cut
-int find_cut_edges(const Graph& graph) {
+// Find the 3-edge cut
+int find_cut_edges() {
     // Compute edge betweenness
-    map<Edge, double> edge_betweenness = compute_edge_betweenness(graph, 100);
+    compute_edge_betweenness();
 
-    // Sort edges by betweenness (highest first)
-    vector<pair<Edge, double>> sorted_edges(edge_betweenness.begin(), edge_betweenness.end());
-    sort(sorted_edges.begin(), sorted_edges.end(),
-         [](const auto& a, const auto& b) { return a.second > b.second; });
+    // Sort edges by betweenness
+    sort(edges.begin(), edges.end(),
+         [](const Edge& a, const Edge& b) { return a.betweenness > b.betweenness; });
 
-    int total_nodes = graph.size();
+    // Try combinations of top edges
+    int top_count = min((int)edges.size(), TOP_CANDIDATES);
 
-    // Try removing top candidate edges
-    vector<Edge> top_edges;
-    for (int i = 0; i < min(20, (int)sorted_edges.size()); i++) {
-        top_edges.push_back(sorted_edges[i].first);
-    }
+    for (int i = 0; i < top_count; i++) {
+        for (int j = i + 1; j < top_count; j++) {
+            for (int k = j + 1; k < top_count; k++) {
+                bool excluded[MAX_NODES * 2] = {false};
+                excluded[i] = true;
+                excluded[j] = true;
+                excluded[k] = true;
 
-    // Try all combinations of 3 edges
-    for (int i = 0; i < (int)top_edges.size(); i++) {
-        for (int j = i + 1; j < (int)top_edges.size(); j++) {
-            for (int k = j + 1; k < (int)top_edges.size(); k++) {
-                set<Edge> excluded;
-                excluded.insert(top_edges[i]);
-                excluded.insert(top_edges[j]);
-                excluded.insert(top_edges[k]);
+                int size1 = bfs_component_size(0, excluded);
 
-                string start = graph.begin()->first;
-                int size1 = bfs_component_size(graph, start, excluded);
-
-                if (size1 < total_nodes) {
-                    // Graph is disconnected!
-                    int size2 = total_nodes - size1;
+                if (size1 < node_count) {
+                    int size2 = node_count - size1;
                     return size1 * size2;
                 }
             }
@@ -199,20 +225,13 @@ int find_cut_edges(const Graph& graph) {
     return -1;
 }
 
-int part1(const string& filename) {
-    Graph graph = parse_input(filename);
-    return find_cut_edges(graph);
-}
-
-string part2(const string&) {
-    return "Push the big red button!";
-}
-
 int main() {
-    string input_file = "../input.txt";
+    parse_input("../input.txt");
 
-    cout << "Part 1: " << part1(input_file) << endl;
-    cout << "Part 2: " << part2(input_file) << endl;
+    int part1 = find_cut_edges();
+
+    cout << "Part 1: " << part1 << endl;
+    cout << "Part 2: Push the big red button!" << endl;
 
     return 0;
 }

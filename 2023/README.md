@@ -479,10 +479,10 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Python      | 212.3        | 53.8        |
 | Common Lisp | 337.2        | 93.2        |
 | Clojure     | 849.3        | 713.0       |
+| Perl        | 874.2        | 74.2        |
 | Ruby        | 926.2        | 53.3        |
 | Bash        | 1,867.9      | 36.6        |
 | ColdFusion  | 4,029.7      | 1,076.6     |
-| Perl        | 37,189.2     | 117.8       |
 
 ### Day 22: Sand Slabs
 
@@ -520,7 +520,7 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Common Lisp | 4,001.3      | 53.0        |
 | PHP         | 4,721.3      | 25.7        |
 | Ruby        | 7,576.8      | 27.9        |
-| Python      | 10,414.5     | 15.8        |
+| Python      | 7,157.8      | 16.1        |
 | Clojure     | 11,336.2     | 1,323.7     |
 | Perl        | 15,922.1     | 4.6         |
 | ColdFusion  | 31,407.9     | 1,026.5     |
@@ -552,6 +552,7 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Language    | Runtime (ms) | Memory (MB) |
 |-------------|--------------|-------------|
 | ARM64       | 8.2          | 1.9         |
+| C++         | 14.9         | 33.9        |
 | Java        | 58.7         | 47.9        |
 | Zig         | 140.3        | 3.2         |
 | Rust        | 144.7        | 4.9         |
@@ -562,7 +563,6 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | C           | 299.0        | 29.2        |
 | Common Lisp | 305.8        | 90.7        |
 | Perl        | 424.7        | 8.6         |
-| C++         | 489.3        | 3.6         |
 | Ruby        | 600.7        | 31.0        |
 | Clojure     | 895.7        | 801.8       |
 | ColdFusion  | 4,003.1      | 1,063.7     |
