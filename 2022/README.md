@@ -30,6 +30,7 @@ Solutions implemented in 16 languages.
 | 22  | ⭐⭐   | C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 23  | ⭐⭐   | C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 24  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
+| 25  | ⭐    | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 
 ## Benchmarks
 
@@ -544,3 +545,26 @@ Note: Day 21 is a simple expression tree evaluation. Scripting languages excel h
 | Ruby        | 6,866.3      | 196.8       |
 | ColdFusion  | 8,388.3      | 1,414.5     |
 | Bash        | TBD          | TBD         |
+
+### Day 25: Full of Hot Air
+
+| Language    | Runtime (ms) | Memory (MB) |
+|-------------|--------------|-------------|
+| C           | 5.3          | 1.9         |
+| ARM64 asm   | 5.5          | 1.9         |
+| C++         | 5.8          | 1.9         |
+| Rust        | 5.8          | 1.9         |
+| Zig         | 7.2          | 1.9         |
+| Go          | 8.5          | 4.1         |
+| Perl        | 16.3         | 5.9         |
+| Bash        | 16.2         | 6.7         |
+| Python      | 23.4         | 14.7        |
+| Common Lisp | 27.4         | 39.6        |
+| Node.js     | 44.6         | 37.8        |
+| Ruby        | 58.5         | 27.8        |
+| Java        | 61.7         | 46.6        |
+| PHP         | 69.6         | 25.5        |
+| Clojure     | 403.9        | 125.9       |
+| ColdFusion  | 2,680.6      | 1,006.2     |
+
+Note: Day 25 only has Part 1 - Part 2 is automatic when all other stars are collected.
