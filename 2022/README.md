@@ -21,6 +21,7 @@ Solutions implemented in 16 languages.
 | 13  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 14  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 15  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
+| 16  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 
 ## Benchmarks
 
@@ -340,3 +341,24 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Perl        | 27,578.1     | 5.7         |
 | ColdFusion  | 36,493.2     | 1,080.6     |
 | Zig         | 42,717.9     | 1.9         |
+
+### Day 16: Proboscidea Volcanium
+
+| Language    | Runtime (ms) | Memory (MB) |
+|-------------|--------------|-------------|
+| C           | 1,570.9      | 63.5        |
+| ARM64 asm   | 1,742.6      | 1.9         |
+| Zig         | 3,990.3      | 3.2         |
+| Rust        | 4,089.7      | 13.1        |
+| Java        | 8,292.7      | 1,286.2     |
+| Node.js     | 12,218.2     | 95.4        |
+| Go          | 19,171.8     | 17.6        |
+| C++         | 23,761.0     | 9.3         |
+| PHP         | 25,505.1     | 35.8        |
+| Common Lisp | 37,321.1     | 117.6       |
+| Python      | 47,733.5     | 91.2        |
+| Clojure     | 60,453.3     | 1,352.3     |
+| Bash        | 89,063.4     | 7.7         |
+| Perl        | 94,767.1     | 2,849.7     |
+| Ruby        | 141,826.6    | 47.6        |
+| ColdFusion  | TBD          | TBD         |
