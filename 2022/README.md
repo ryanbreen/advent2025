@@ -20,6 +20,7 @@ Solutions implemented in 16 languages.
 | 12  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 13  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 14  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
+| 15  | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 
 ## Benchmarks
 
@@ -318,3 +319,24 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Ruby        | 2,849.7      | 30.8        |
 | ColdFusion  | 3,726.0      | 1,054.1     |
 | Bash        | TBD          | TBD         |
+
+### Day 15: Beacon Exclusion Zone
+
+| Language    | Runtime (ms) | Memory (MB) |
+|-------------|--------------|-------------|
+| Bash        | 26.7         | 7.1         |
+| ARM64 asm   | 242.4        | 1.9         |
+| C           | 250.9        | 1.9         |
+| Rust        | 471.2        | 1.9         |
+| C++         | 581.0        | 1.9         |
+| Java        | 934.9        | 1,072.5     |
+| Node.js     | 1,235.3      | 54.3        |
+| Go          | 1,536.9      | 10.3        |
+| Common Lisp | 2,041.4      | 89.8        |
+| Clojure     | 6,661.5      | 1,319.2     |
+| PHP         | 8,573.2      | 26.1        |
+| Python      | 10,297.4     | 15.0        |
+| Ruby        | 15,559.0     | 28.6        |
+| Perl        | 27,578.1     | 5.7         |
+| ColdFusion  | 36,493.2     | 1,080.6     |
+| Zig         | 42,717.9     | 1.9         |
