@@ -13,6 +13,7 @@ Solutions implemented in 16 languages.
 | 5   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 6   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 7   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
+| 8   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 
 ## Benchmarks
 
@@ -164,3 +165,24 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Go          | 68.2         | 26.7        |
 | Clojure     | 385.9        | 131.3       |
 | ColdFusion  | 2,444.6      | 1,212.6     |
+
+### Day 8: Treetop Tree House
+
+| Language    | Runtime (ms) | Memory (MB) |
+|-------------|--------------|-------------|
+| C           | 5.8          | 1.9         |
+| C++         | 6.0          | 1.9         |
+| Zig         | 6.0          | 1.9         |
+| Rust        | 6.0          | 1.9         |
+| ARM64 asm   | 6.1          | 1.9         |
+| Common Lisp | 35.4         | 44.4        |
+| Java        | 43.9         | 47.2        |
+| Python      | 47.6         | 15.1        |
+| Node.js     | 48.4         | 42.8        |
+| Perl        | 49.6         | 6.9         |
+| PHP         | 63.8         | 25.6        |
+| Go          | 73.7         | 27.1        |
+| Ruby        | 84.7         | 28.2        |
+| Clojure     | 507.1        | 204.4       |
+| ColdFusion  | 2,633.3      | 1,127.9     |
+| Bash        | 188,810      | 6.9         |
