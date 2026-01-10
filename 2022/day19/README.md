@@ -93,6 +93,7 @@ Day 19 is one of the slowest AoC problems. Execution times vary greatly by langu
 - **Python**: 46.8s - interpreter overhead
 - **Ruby**: 47.3s - similar to Python
 - **ColdFusion**: 53.8s - JVM overhead
+- **Bash**: 242.1s (~4 min) - AWK-based DFS with hash table memoization
 
 ### Implementation Notes
 
@@ -120,7 +121,7 @@ Day 19 is one of the slowest AoC problems. Execution times vary greatly by langu
 | Python      | 46,846.7     | 2,680.1     |
 | Ruby        | 47,328.9     | 417.6       |
 | ColdFusion  | 53,752.6     | 2,899.7     |
-| Bash        | TBD          | TBD         |
+| Bash        | 242,100.0    | 375.6       |
 
 ## Answers
 

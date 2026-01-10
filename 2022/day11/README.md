@@ -112,7 +112,7 @@ Same as Part 1, but:
 | Perl        | 387.3        | 4.8         |
 | Clojure     | 830.0        | 1,020.0     |
 | ColdFusion  | 3,486.1      | 1,041.4     |
-| Bash        | TBD          | TBD         |
+| Bash        | 574,626.6    | 6.7         |
 
 ## Answers
 

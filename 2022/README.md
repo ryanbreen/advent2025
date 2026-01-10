@@ -265,7 +265,7 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Perl        | 387.3        | 4.8         |
 | Clojure     | 830.0        | 1,020.0     |
 | ColdFusion  | 3,486.1      | 1,041.4     |
-| Bash        | TBD          | TBD         |
+| Bash        | 574,626.6    | 6.7         |
 
 ### Day 12: Hill Climbing Algorithm
 
@@ -328,7 +328,7 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Clojure     | 946.1        | 607.0       |
 | Ruby        | 2,849.7      | 30.8        |
 | ColdFusion  | 3,726.0      | 1,054.1     |
-| Bash        | TBD          | TBD         |
+| Bash        | 26,025.8     | 6.7         |
 
 ### Day 15: Beacon Exclusion Zone
 
@@ -370,7 +370,7 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Bash        | 89,063.4     | 7.7         |
 | Perl        | 94,767.1     | 2,849.7     |
 | Ruby        | 141,826.6    | 47.6        |
-| ColdFusion  | TBD          | TBD         |
+| ColdFusion  | 2,921.1      | 1,092.9     |
 
 ### Day 17: Pyroclastic Flow
 
@@ -436,7 +436,7 @@ Note: Go implementation has a memory issue that needs investigation.
 | Python      | 46,846.7     | 2,680.1     |
 | Ruby        | 47,328.9     | 417.6       |
 | ColdFusion  | 53,752.6     | 2,899.7     |
-| Bash        | TBD          | TBD         |
+| Bash        | 242,100.0    | 375.6       |
 
 Note: Day 19 is one of the slowest AoC problems - requires DFS with aggressive pruning.
 
@@ -503,7 +503,7 @@ Note: Day 21 is a simple expression tree evaluation. Scripting languages excel h
 | Go          | 85.9         | 27.3        |
 | Clojure     | 510.8        | 202.0       |
 | ColdFusion  | 2,492.3      | 1,061.6     |
-| ARM64 asm   | TBD          | TBD         |
+| ARM64 asm   | 6.4          | 1.9         |
 
 ### Day 23: Unstable Diffusion
 
