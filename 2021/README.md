@@ -8,7 +8,7 @@ Solutions implemented in 16 languages.
 |-----|-------|-----------|
 | 1   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 2   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
-| 3   |       |           |
+| 3   | ⭐⭐   | ARM64, C, C++, Rust, Zig, Go, Java, Node.js, Python, Ruby, PHP, Perl, Bash, Clojure, Common Lisp, ColdFusion |
 | 4   |       |           |
 | 5   |       |           |
 | 6   |       |           |
@@ -77,3 +77,24 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Ruby        | 60.2         | 28.1        |
 | Clojure     | 406.7        | 131.2       |
 | ColdFusion  | 2,647.0      | 1,157.7     |
+
+### Day 3: Binary Diagnostic
+
+| Language    | Runtime (ms) | Memory (MB) |
+|-------------|--------------|-------------|
+| Zig         | 5.5          | 1.9         |
+| ARM64 asm   | 5.5          | 1.9         |
+| C++         | 6.1          | 1.9         |
+| C           | 6.6          | 1.9         |
+| Rust        | 6.7          | 1.9         |
+| Go          | 7.4          | 4.1         |
+| Perl        | 11.6         | 8.6         |
+| Common Lisp | 23.4         | 38.9        |
+| Python      | 27.9         | 15.1        |
+| Node.js     | 46.8         | 42.3        |
+| Java        | 58.3         | 46.1        |
+| Ruby        | 60.6         | 28.0        |
+| PHP         | 66.0         | 25.7        |
+| Bash        | 102.4        | 2.2         |
+| Clojure     | 431.7        | 128.4       |
+| ColdFusion  | 2,462.7      | 1,125.8     |

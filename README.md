@@ -10,7 +10,7 @@ Solutions to [Advent of Code](https://adventofcode.com/) challenges across multi
 | [2024](2024/) | 25/25 | Complete |
 | [2023](2023/) | 25/25 | Complete |
 | [2022](2022/) | 25/25 | Complete |
-| [2021](2021/) | 2/25 | In Progress |
+| [2021](2021/) | 3/25 | In Progress |
 
 ## Approach
 
