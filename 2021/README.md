@@ -119,3 +119,24 @@ All benchmarks run on Apple Silicon (M-series), averaged over multiple runs.
 | Clojure     | 519.6        | 143.9       |
 | Bash        | 1,058.3      | 13.7        |
 | ColdFusion  | 2,425.4      | 1,035.5     |
+
+### Day 5: Hydrothermal Venture
+
+| Language    | Runtime (ms) | Memory (MB) |
+|-------------|--------------|-------------|
+| C           | 7.3          | 5.1         |
+| ARM64 asm   | 10.6         | 2.2         |
+| Zig         | 15.4         | 5.6         |
+| Rust        | 17.8         | 11.1        |
+| C++         | 21.9         | 10.7        |
+| Go          | 22.2         | 13.8        |
+| Common Lisp | 50.6         | 65.9        |
+| Python      | 85.9         | 46.2        |
+| PHP         | 88.9         | 38.8        |
+| Node.js     | 102.3        | 72.3        |
+| Perl        | 111.0        | 30.5        |
+| Java        | 111.5        | 76.5        |
+| Ruby        | 346.2        | 58.5        |
+| Clojure     | 537.2        | 229.6       |
+| ColdFusion  | 2,958.7      | 1,010.4     |
+| Bash        | 3,392.6      | 41.4        |
